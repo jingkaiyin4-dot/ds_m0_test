@@ -1,0 +1,27 @@
+# CCS / build output
+Debug/**/*.o
+Debug/**/*.d
+Debug/**/*.mk
+Debug/**/*.opt
+Debug/**/*.out
+Debug/**/*.map
+Debug/**/*_linkInfo.xml
+Debug/Event.dot
+Debug/objects.mk
+Debug/sources.mk
+Debug/makefile
+Debug/device.cmd.genlibs
+Debug/device.opt
+Debug/.clangd/
+
+# Keep generated SysConfig source checked in
+!Debug/ti_msp_dl_config.c
+!Debug/ti_msp_dl_config.h
+
+# IDE / local workspace
+.theia/*.log
+.settings/*.log
+
+# OS cruft
+Thumbs.db
+Desktop.ini
