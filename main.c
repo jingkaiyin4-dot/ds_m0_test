@@ -32,30 +32,21 @@
 
 #include "ti_msp_dl_config.h"
 #include "main.h"
-#include "app/CameraControl.h"
-#include "app/EncoderTest.h"
+#include "app/ZdtStepperTest.h"
 
 int main(void)
 {
-    unsigned long lastDisplayMs = 0;
-
     SYSCFG_DL_init();
     SysTick_Init();
     OLED_Init();
-    EncoderTest_Init();
-    CameraControl_Init();
+    ZdtStepperTest_Init();
 
     enable_group1_irq = 1U;
     Interrupt_Init();
 
     while (1) 
     {
-        CameraControl_Process();
-
-        if ((tick_ms - lastDisplayMs) < 200U) {
-            continue;
-        }
-        lastDisplayMs = tick_ms;
-        EncoderTest_Update();
+        ZdtStepperTest_Update();
+        mspm0_delay_ms(100);
     }
 }
