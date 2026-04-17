@@ -27,7 +27,7 @@ void GROUP1_IRQHandler(void)
 {
     uint32_t pending = DL_GPIO_getEnabledInterruptStatus(
         Encoder_PORT,
-        ENCODER_RIGHT_A_PIN | ENCODER_LEFT_A_PIN | GPIO_MPU6050_PIN_INT_PIN);
+        ENCODER_RIGHT_A_PIN | ENCODER_LEFT_A_PIN);
 
     if (pending & ENCODER_RIGHT_A_PIN) {
         bool forward = (DL_GPIO_readPins(Encoder_PORT, ENCODER_RIGHT_B_PIN) == 0U);
@@ -39,10 +39,6 @@ void GROUP1_IRQHandler(void)
         bool forward = (DL_GPIO_readPins(Encoder_PORT, ENCODER_LEFT_B_PIN) != 0U);
         Encoder_Update(ENCODER_LEFT, forward);
         DL_GPIO_clearInterruptStatus(Encoder_PORT, ENCODER_LEFT_A_PIN);
-    }
-
-    if (pending & GPIO_MPU6050_PIN_INT_PIN) {
-        DL_GPIO_clearInterruptStatus(Encoder_PORT, GPIO_MPU6050_PIN_INT_PIN);
     }
 }
 
