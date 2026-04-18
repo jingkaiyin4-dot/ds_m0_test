@@ -32,21 +32,46 @@
 
 #include "ti_msp_dl_config.h"
 #include "main.h"
-#include "app/ZdtStepperTest.h"
+#include "stdio.h"
+
+static uint8_t oled_buffer[32];
 
 int main(void)
 {
     SYSCFG_DL_init();
     SysTick_Init();
     OLED_Init();
-    ZdtStepperTest_Init();
+    BNO08X_Init();
 
     enable_group1_irq = 1U;
     Interrupt_Init();
 
+    OLED_ShowString(0,7,(uint8_t *)"BNO08X Demo",8);
+    OLED_ShowString(0,0,(uint8_t *)"Pitch",8);
+    OLED_ShowString(0,2,(uint8_t *)" Roll",8);
+    OLED_ShowString(0,4,(uint8_t *)"  Yaw",8);
+    OLED_ShowString(16*6,7,(uint8_t *)"Index",8);
+    OLED_ShowString(16*6,0,(uint8_t *)"Accel",8);
+
     while (1) 
     {
-        ZdtStepperTest_Update();
-        mspm0_delay_ms(100);
+        sprintf((char *)oled_buffer, "%3u", bno08x_data.index);
+        OLED_ShowString(18*6,6,oled_buffer,8);
+
+        sprintf((char *)oled_buffer, "%-6.1f", bno08x_data.pitch);
+        OLED_ShowString(5*8,0,oled_buffer,16);
+        sprintf((char *)oled_buffer, "%-6.1f", bno08x_data.roll);
+        OLED_ShowString(5*8,2,oled_buffer,16);
+        sprintf((char *)oled_buffer, "%-6.1f", bno08x_data.yaw);
+        OLED_ShowString(5*8,4,oled_buffer,16);
+
+        sprintf((char *)oled_buffer, "%6d", bno08x_data.ax);
+        OLED_ShowString(15*6,1,oled_buffer,8);
+        sprintf((char *)oled_buffer, "%6d", bno08x_data.ay);
+        OLED_ShowString(15*6,2,oled_buffer,8);
+        sprintf((char *)oled_buffer, "%6d", bno08x_data.az);
+        OLED_ShowString(15*6,3,oled_buffer,8);
+
+        mspm0_delay_ms(50);
     }
 }

@@ -204,18 +204,35 @@ extern "C" {
 
 
 
+/* Defines for SPI_OLED */
+#define SPI_OLED_INST                                                      SPI1
+#define SPI_OLED_INST_IRQHandler                                SPI1_IRQHandler
+#define SPI_OLED_INST_INT_IRQN                                    SPI1_INT_IRQn
+#define GPIO_SPI_OLED_PICO_PORT                                           GPIOB
+#define GPIO_SPI_OLED_PICO_PIN                                    DL_GPIO_PIN_8
+#define GPIO_SPI_OLED_IOMUX_PICO                                (IOMUX_PINCM25)
+#define GPIO_SPI_OLED_IOMUX_PICO_FUNC                IOMUX_PINCM25_PF_SPI1_PICO
+#define GPIO_SPI_OLED_POCI_PORT                                           GPIOA
+#define GPIO_SPI_OLED_POCI_PIN                                   DL_GPIO_PIN_16
+#define GPIO_SPI_OLED_IOMUX_POCI                                (IOMUX_PINCM38)
+#define GPIO_SPI_OLED_IOMUX_POCI_FUNC                IOMUX_PINCM38_PF_SPI1_POCI
+/* GPIO configuration for SPI_OLED */
+#define GPIO_SPI_OLED_SCLK_PORT                                           GPIOB
+#define GPIO_SPI_OLED_SCLK_PIN                                    DL_GPIO_PIN_9
+#define GPIO_SPI_OLED_IOMUX_SCLK                                (IOMUX_PINCM26)
+#define GPIO_SPI_OLED_IOMUX_SCLK_FUNC                IOMUX_PINCM26_PF_SPI1_SCLK
+#define GPIO_SPI_OLED_CS0_PORT                                            GPIOA
+#define GPIO_SPI_OLED_CS0_PIN                                     DL_GPIO_PIN_2
+#define GPIO_SPI_OLED_IOMUX_CS0                                  (IOMUX_PINCM7)
+#define GPIO_SPI_OLED_IOMUX_CS0_FUNC                   IOMUX_PINCM7_PF_SPI1_CS0
 
-/* Port definition for Pin Group GPIO_MPU6050 */
-#define GPIO_MPU6050_PORT                                                (GPIOB)
 
-/* Defines for PIN_INT: GPIOB.14 with pinCMx 31 on package pin 2 */
-// groups represented: ["Encoder","GPIO_MPU6050"]
-// pins affected: ["PIN_LA","PIN_RA","PIN_INT"]
-#define GPIO_MULTIPLE_GPIOB_INT_IRQN                            (GPIOB_INT_IRQn)
-#define GPIO_MULTIPLE_GPIOB_INT_IIDX            (DL_INTERRUPT_GROUP1_IIDX_GPIOB)
-#define GPIO_MPU6050_PIN_INT_IIDX                           (DL_GPIO_IIDX_DIO14)
-#define GPIO_MPU6050_PIN_INT_PIN                                (DL_GPIO_PIN_14)
-#define GPIO_MPU6050_PIN_INT_IOMUX                               (IOMUX_PINCM31)
+
+/* Defines for DMA_BNO08X */
+#define DMA_BNO08X_CHAN_ID                                                   (0)
+#define UART_BNO08_INST_DMA_TRIGGER                          (DMA_UART2_RX_TRIG)
+
+
 /* Port definition for Pin Group Encoder */
 #define Encoder_PORT                                                     (GPIOB)
 
@@ -223,6 +240,9 @@ extern "C" {
 #define Encoder_PIN_LB_PIN                                       (DL_GPIO_PIN_5)
 #define Encoder_PIN_LB_IOMUX                                     (IOMUX_PINCM18)
 /* Defines for PIN_LA: GPIOB.3 with pinCMx 16 on package pin 51 */
+// pins affected by this interrupt request:["PIN_LA","PIN_RA"]
+#define Encoder_INT_IRQN                                        (GPIOB_INT_IRQn)
+#define Encoder_INT_IIDX                        (DL_INTERRUPT_GROUP1_IIDX_GPIOB)
 #define Encoder_PIN_LA_IIDX                                  (DL_GPIO_IIDX_DIO3)
 #define Encoder_PIN_LA_PIN                                       (DL_GPIO_PIN_3)
 #define Encoder_PIN_LA_IOMUX                                     (IOMUX_PINCM16)
@@ -249,6 +269,21 @@ extern "C" {
 #define MOTOR_MOTOR_RB_PORT                                              (GPIOB)
 #define MOTOR_MOTOR_RB_PIN                                       (DL_GPIO_PIN_2)
 #define MOTOR_MOTOR_RB_IOMUX                                     (IOMUX_PINCM15)
+/* Port definition for Pin Group GPIO_OLED */
+#define GPIO_OLED_PORT                                                   (GPIOB)
+
+/* Defines for PIN_OLED_RES: GPIOB.10 with pinCMx 27 on package pin 62 */
+#define GPIO_OLED_PIN_OLED_RES_PIN                              (DL_GPIO_PIN_10)
+#define GPIO_OLED_PIN_OLED_RES_IOMUX                             (IOMUX_PINCM27)
+/* Defines for PIN_OLED_DC: GPIOB.11 with pinCMx 28 on package pin 63 */
+#define GPIO_OLED_PIN_OLED_DC_PIN                               (DL_GPIO_PIN_11)
+#define GPIO_OLED_PIN_OLED_DC_IOMUX                              (IOMUX_PINCM28)
+/* Defines for PIN_OLED_CS: GPIOB.14 with pinCMx 31 on package pin 2 */
+#define GPIO_OLED_PIN_OLED_CS_PIN                               (DL_GPIO_PIN_14)
+#define GPIO_OLED_PIN_OLED_CS_IOMUX                              (IOMUX_PINCM31)
+/* Defines for PIN_OLED_BLK: GPIOB.26 with pinCMx 57 on package pin 28 */
+#define GPIO_OLED_PIN_OLED_BLK_PIN                              (DL_GPIO_PIN_26)
+#define GPIO_OLED_PIN_OLED_BLK_IOMUX                             (IOMUX_PINCM57)
 
 /* clang-format on */
 
@@ -264,6 +299,8 @@ void SYSCFG_DL_UART_BNO08_init(void);
 void SYSCFG_DL_UART_CAM_init(void);
 void SYSCFG_DL_UART_bj1_init(void);
 void SYSCFG_DL_UART_bj2_init(void);
+void SYSCFG_DL_SPI_OLED_init(void);
+void SYSCFG_DL_DMA_init(void);
 
 
 bool SYSCFG_DL_saveConfiguration(void);

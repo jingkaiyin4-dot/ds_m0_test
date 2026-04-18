@@ -26,47 +26,34 @@ void TIMA0_IRQHandler(void)
 #if defined UART_BNO08X_INST_IRQHandler
 void UART_BNO08X_INST_IRQHandler(void)
 {
-    static uint8_t packet[19];
-    static uint8_t index = 0;
+    uint8_t checkSum = 0;
 
-    while (DL_UART_Main_isRXFIFOEmpty(UART_BNO08X_INST) == false)
+    DL_DMA_disableChannel(DMA, DMA_BNO08X_CHAN_ID);
+    uint8_t rxSize = 18 - DL_DMA_getTransferSize(DMA, DMA_BNO08X_CHAN_ID);
+
+    if(DL_UART_isRXFIFOEmpty(UART_BNO08X_INST) == false)
+        bno08x_dmaBuffer[rxSize++] = DL_UART_receiveData(UART_BNO08X_INST);
+
+    for(int i=2; i<=14; i++)
+        checkSum += bno08x_dmaBuffer[i];
+
+    if((rxSize == 19) && (bno08x_dmaBuffer[0] == 0xAA) && (bno08x_dmaBuffer[1] == 0xAA) && (checkSum == bno08x_dmaBuffer[18]))
     {
-        uint8_t byte = DL_UART_Main_receiveData(UART_BNO08X_INST);
-
-        if (index == 0U) {
-            if (byte != 0xAAU) {
-                continue;
-            }
-            packet[index++] = byte;
-            continue;
-        }
-
-        if ((index == 1U) && (byte != 0xAAU)) {
-            index = 0U;
-            continue;
-        }
-
-        packet[index++] = byte;
-        if (index >= sizeof(packet)) {
-            uint8_t checkSum = 0;
-
-            for (uint8_t i = 2U; i <= 14U; i++) {
-                checkSum += packet[i];
-            }
-
-            if (checkSum == packet[18]) {
-                bno08x_data.index = packet[2];
-                bno08x_data.yaw = (int16_t)((packet[4] << 8) | packet[3]) / 100.0f;
-                bno08x_data.pitch = (int16_t)((packet[6] << 8) | packet[5]) / 100.0f;
-                bno08x_data.roll = (int16_t)((packet[8] << 8) | packet[7]) / 100.0f;
-                bno08x_data.ax = (int16_t)((packet[10] << 8) | packet[9]);
-                bno08x_data.ay = (int16_t)((packet[12] << 8) | packet[11]);
-                bno08x_data.az = (int16_t)((packet[14] << 8) | packet[13]);
-            }
-
-            index = 0U;
-        }
+        bno08x_data.index = bno08x_dmaBuffer[2];
+        bno08x_data.yaw = (int16_t)((bno08x_dmaBuffer[4]<<8)|bno08x_dmaBuffer[3]) / 100.0;
+        bno08x_data.pitch = (int16_t)((bno08x_dmaBuffer[6]<<8)|bno08x_dmaBuffer[5]) / 100.0;
+        bno08x_data.roll = (int16_t)((bno08x_dmaBuffer[8]<<8)|bno08x_dmaBuffer[7]) / 100.0;
+        bno08x_data.ax = (bno08x_dmaBuffer[10]<<8)|bno08x_dmaBuffer[9];
+        bno08x_data.ay = (bno08x_dmaBuffer[12]<<8)|bno08x_dmaBuffer[11];
+        bno08x_data.az = (bno08x_dmaBuffer[14]<<8)|bno08x_dmaBuffer[13];
     }
+
+    uint8_t dummy[4];
+    DL_UART_drainRXFIFO(UART_BNO08X_INST, dummy, 4);
+
+    DL_DMA_setDestAddr(DMA, DMA_BNO08X_CHAN_ID, (uint32_t) &bno08x_dmaBuffer[0]);
+    DL_DMA_setTransferSize(DMA, DMA_BNO08X_CHAN_ID, 18);
+    DL_DMA_enableChannel(DMA, DMA_BNO08X_CHAN_ID);
 }
 #endif
 

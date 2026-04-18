@@ -49,13 +49,20 @@ void OLED_DisplayTurn(uint8_t i)
 void OLED_WR_Byte(uint8_t dat,uint8_t cmd)
 {
     while (DL_SPI_isBusy(SPI_OLED_INST));
+    while (DL_SPI_isTXFIFOFull(SPI_OLED_INST));
+
+    OLED_CS_Clr();
 
     if(cmd)
-        DL_SPI_setControllerCommandDataModeConfig(SPI_OLED_INST, DL_SPI_CD_MODE_DATA);
+        OLED_DC_Set();
     else
-        DL_SPI_setControllerCommandDataModeConfig(SPI_OLED_INST, DL_SPI_CD_MODE_COMMAND);
+        OLED_DC_Clr();
 
     DL_SPI_transmitData8(SPI_OLED_INST, dat);
+    while (DL_SPI_isBusy(SPI_OLED_INST));
+    while (DL_SPI_isTXFIFOEmpty(SPI_OLED_INST) == false);
+
+    OLED_CS_Set();
 } 
 
 //坐标设置
@@ -197,9 +204,14 @@ void OLED_DrawBMP(uint8_t x,uint8_t y,uint8_t sizex, uint8_t sizey,uint8_t BMP[]
 //初始化SSD1306					    
 void OLED_Init(void)
 {
+    OLED_BLK_Set();
+    OLED_CS_Set();
+    OLED_DC_Set();
+
     OLED_RES_Clr();
     delay_ms(200);
     OLED_RES_Set();
+    delay_ms(20);
     
     OLED_WR_Byte(0xAE,OLED_CMD);//--turn off oled panel
     OLED_WR_Byte(0x00,OLED_CMD);//---set low column address

@@ -4,8 +4,6 @@
 #include "clock.h"
 #include "interrupt.h"
 
-#include "oled_software_i2c.h"
-#include "oled_hardware_i2c.h"
 #include "oled_software_spi.h"
 #include "oled_hardware_spi.h"
 #include "ultrasonic_capture.h"

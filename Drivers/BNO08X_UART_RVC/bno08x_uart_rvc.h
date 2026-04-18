@@ -20,7 +20,11 @@
 
 #include "ti_msp_dl_config.h"
 
-#if !defined(UART_BNO08X_INST) && defined(UART_1l_INST)
+#if !defined(UART_BNO08X_INST) && defined(UART_BNO08_INST)
+#define UART_BNO08X_INST UART_BNO08_INST
+#define UART_BNO08X_INST_INT_IRQN UART_BNO08_INST_INT_IRQN
+#define UART_BNO08X_INST_IRQHandler UART_BNO08_INST_IRQHandler
+#elif !defined(UART_BNO08X_INST) && defined(UART_1l_INST)
 #define UART_BNO08X_INST UART_1l_INST
 #define UART_BNO08X_INST_INT_IRQN UART_1l_INST_INT_IRQN
 #define UART_BNO08X_INST_IRQHandler UART_1l_INST_IRQHandler
@@ -28,9 +32,9 @@
 
 typedef struct {
     uint8_t index;
-    float yaw;
     float pitch;
     float roll;
+    float yaw;
     int16_t ax;
     int16_t ay;
     int16_t az;
@@ -39,6 +43,7 @@ typedef struct {
 #if defined UART_BNO08X_INST
 void BNO08X_Init(void);
 extern BNO08X_RVC_Data_t bno08x_data;
+extern uint8_t bno08x_dmaBuffer[19];
 #endif
 
 #endif  /* #ifndef _BNO08X_UART_RVC_H_ */

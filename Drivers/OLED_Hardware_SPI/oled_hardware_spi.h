@@ -23,14 +23,58 @@
 #define OLED_DATA 1	//写数据
 
 #ifndef GPIO_OLED_PIN_RES_PORT
+#if defined(GPIO_OLED_PIN_OLED_RES_PIN)
+#define GPIO_OLED_PIN_RES_PORT GPIO_OLED_PORT
+#define GPIO_OLED_PIN_RES_PIN  GPIO_OLED_PIN_OLED_RES_PIN
+#else
 #define GPIO_OLED_PIN_RES_PORT GPIO_OLED_PORT 
+#endif
+#endif
+
+#ifndef GPIO_OLED_PIN_DC_PORT
+#if defined(GPIO_OLED_PIN_OLED_DC_PIN)
+#define GPIO_OLED_PIN_DC_PORT GPIO_OLED_PORT
+#define GPIO_OLED_PIN_DC_PIN  GPIO_OLED_PIN_OLED_DC_PIN
+#else
+#define GPIO_OLED_PIN_DC_PORT GPIO_OLED_PORT
+#endif
+#endif
+
+#ifndef GPIO_OLED_PIN_CS_PORT
+#if defined(GPIO_OLED_PIN_OLED_CS_PIN)
+#define GPIO_OLED_PIN_CS_PORT GPIO_OLED_PORT
+#define GPIO_OLED_PIN_CS_PIN  GPIO_OLED_PIN_OLED_CS_PIN
+#else
+#define GPIO_OLED_PIN_CS_PORT GPIO_OLED_PORT
+#endif
+#endif
+
+#ifndef GPIO_OLED_PIN_BLK_PORT
+#if defined(GPIO_OLED_PIN_OLED_BLK_PIN)
+#define GPIO_OLED_PIN_BLK_PORT GPIO_OLED_PORT
+#define GPIO_OLED_PIN_BLK_PIN  GPIO_OLED_PIN_OLED_BLK_PIN
+#else
+#define GPIO_OLED_PIN_BLK_PORT GPIO_OLED_PORT
+#endif
 #endif
 
 //----------------------------------------------------------------------------------
 //OLED SSD1306 复位/RES
 #define		OLED_RES_Set()				(DL_GPIO_setPins(GPIO_OLED_PIN_RES_PORT, GPIO_OLED_PIN_RES_PIN))
 #define		OLED_RES_Clr()			    (DL_GPIO_clearPins(GPIO_OLED_PIN_RES_PORT, GPIO_OLED_PIN_RES_PIN))
-					   
+
+// OLED 命令/数据选择
+#define     OLED_DC_Set()               (DL_GPIO_setPins(GPIO_OLED_PIN_DC_PORT, GPIO_OLED_PIN_DC_PIN))
+#define     OLED_DC_Clr()               (DL_GPIO_clearPins(GPIO_OLED_PIN_DC_PORT, GPIO_OLED_PIN_DC_PIN))
+
+// OLED 片选
+#define     OLED_CS_Set()               (DL_GPIO_setPins(GPIO_OLED_PIN_CS_PORT, GPIO_OLED_PIN_CS_PIN))
+#define     OLED_CS_Clr()               (DL_GPIO_clearPins(GPIO_OLED_PIN_CS_PORT, GPIO_OLED_PIN_CS_PIN))
+
+// OLED 背光
+#define     OLED_BLK_Set()              (DL_GPIO_setPins(GPIO_OLED_PIN_BLK_PORT, GPIO_OLED_PIN_BLK_PIN))
+#define     OLED_BLK_Clr()              (DL_GPIO_clearPins(GPIO_OLED_PIN_BLK_PORT, GPIO_OLED_PIN_BLK_PIN))
+				   
 
 //OLED控制用函数
 void delay_ms(uint32_t ms);

@@ -109,7 +109,7 @@
                         </toolChain>
                     </folderInfo>
                     <sourceEntries>
-                        <entry excluding="Drivers/MPU6050|timer|Drivers/WIT|Drivers/OLED_Hardware_SPI|Drivers/Ultrasonic_GPIO|Drivers/Ultrasonic_Capture|Drivers/OLED_Software_SPI|Drivers/OLED_Software_I2C" flags="VALUE_WORKSPACE_PATH|RESOLVED" kind="sourcePath" name=""/>
+                        <entry excluding="Drivers/OLED_Hardware_I2C|Drivers/OLED_Software_SPI|Drivers/OLED_Software_SPI/oled_software_spi.c|Drivers/MPU6050|timer|Drivers/WIT|Drivers/Ultrasonic_GPIO|Drivers/Ultrasonic_Capture|Drivers/OLED_Software_I2C" flags="VALUE_WORKSPACE_PATH|RESOLVED" kind="sourcePath" name=""/>
                     </sourceEntries>
                 </configuration>
             </storageModule>

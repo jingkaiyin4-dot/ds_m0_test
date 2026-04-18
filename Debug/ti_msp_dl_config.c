@@ -43,6 +43,7 @@
 DL_TimerA_backupConfig gMotorBackup;
 DL_TimerA_backupConfig gTIMER_0Backup;
 DL_UART_Main_backupConfig gUART_bj1Backup;
+DL_SPI_backupConfig gSPI_OLEDBackup;
 
 /*
  *  ======== SYSCFG_DL_init ========
@@ -62,10 +63,13 @@ SYSCONFIG_WEAK void SYSCFG_DL_init(void)
     SYSCFG_DL_UART_CAM_init();
     SYSCFG_DL_UART_bj1_init();
     SYSCFG_DL_UART_bj2_init();
+    SYSCFG_DL_SPI_OLED_init();
+    SYSCFG_DL_DMA_init();
     /* Ensure backup structures have no valid state */
 	gMotorBackup.backupRdy 	= false;
 	gTIMER_0Backup.backupRdy 	= false;
 	gUART_bj1Backup.backupRdy 	= false;
+	gSPI_OLEDBackup.backupRdy 	= false;
 
 }
 /*
@@ -79,6 +83,7 @@ SYSCONFIG_WEAK bool SYSCFG_DL_saveConfiguration(void)
 	retStatus &= DL_TimerA_saveConfiguration(Motor_INST, &gMotorBackup);
 	retStatus &= DL_TimerA_saveConfiguration(TIMER_0_INST, &gTIMER_0Backup);
 	retStatus &= DL_UART_Main_saveConfiguration(UART_bj1_INST, &gUART_bj1Backup);
+	retStatus &= DL_SPI_saveConfiguration(SPI_OLED_INST, &gSPI_OLEDBackup);
 
     return retStatus;
 }
@@ -91,6 +96,7 @@ SYSCONFIG_WEAK bool SYSCFG_DL_restoreConfiguration(void)
 	retStatus &= DL_TimerA_restoreConfiguration(Motor_INST, &gMotorBackup, false);
 	retStatus &= DL_TimerA_restoreConfiguration(TIMER_0_INST, &gTIMER_0Backup, false);
 	retStatus &= DL_UART_Main_restoreConfiguration(UART_bj1_INST, &gUART_bj1Backup);
+	retStatus &= DL_SPI_restoreConfiguration(SPI_OLED_INST, &gSPI_OLEDBackup);
 
     return retStatus;
 }
@@ -107,6 +113,8 @@ SYSCONFIG_WEAK void SYSCFG_DL_initPower(void)
     DL_UART_Main_reset(UART_CAM_INST);
     DL_UART_Main_reset(UART_bj1_INST);
     DL_UART_Main_reset(UART_bj2_INST);
+    DL_SPI_reset(SPI_OLED_INST);
+
 
     DL_GPIO_enablePower(GPIOA);
     DL_GPIO_enablePower(GPIOB);
@@ -118,6 +126,8 @@ SYSCONFIG_WEAK void SYSCFG_DL_initPower(void)
     DL_UART_Main_enablePower(UART_CAM_INST);
     DL_UART_Main_enablePower(UART_bj1_INST);
     DL_UART_Main_enablePower(UART_bj2_INST);
+    DL_SPI_enablePower(SPI_OLED_INST);
+
     delay_cycles(POWER_STARTUP_DELAY);
 }
 
@@ -167,9 +177,14 @@ SYSCONFIG_WEAK void SYSCFG_DL_GPIO_init(void)
     DL_GPIO_initPeripheralInputFunction(
         GPIO_UART_bj2_IOMUX_RX, GPIO_UART_bj2_IOMUX_RX_FUNC);
 
-    DL_GPIO_initDigitalInputFeatures(GPIO_MPU6050_PIN_INT_IOMUX,
-		 DL_GPIO_INVERSION_DISABLE, DL_GPIO_RESISTOR_PULL_UP,
-		 DL_GPIO_HYSTERESIS_DISABLE, DL_GPIO_WAKEUP_DISABLE);
+    DL_GPIO_initPeripheralOutputFunction(
+        GPIO_SPI_OLED_IOMUX_SCLK, GPIO_SPI_OLED_IOMUX_SCLK_FUNC);
+    DL_GPIO_initPeripheralOutputFunction(
+        GPIO_SPI_OLED_IOMUX_PICO, GPIO_SPI_OLED_IOMUX_PICO_FUNC);
+    DL_GPIO_initPeripheralInputFunction(
+        GPIO_SPI_OLED_IOMUX_POCI, GPIO_SPI_OLED_IOMUX_POCI_FUNC);
+    DL_GPIO_initPeripheralOutputFunction(
+        GPIO_SPI_OLED_IOMUX_CS0, GPIO_SPI_OLED_IOMUX_CS0_FUNC);
 
     DL_GPIO_initDigitalInputFeatures(Encoder_PIN_LB_IOMUX,
 		 DL_GPIO_INVERSION_DISABLE, DL_GPIO_RESISTOR_NONE,
@@ -195,22 +210,35 @@ SYSCONFIG_WEAK void SYSCFG_DL_GPIO_init(void)
 
     DL_GPIO_initDigitalOutput(MOTOR_MOTOR_RB_IOMUX);
 
+    DL_GPIO_initDigitalOutput(GPIO_OLED_PIN_OLED_RES_IOMUX);
+
+    DL_GPIO_initDigitalOutput(GPIO_OLED_PIN_OLED_DC_IOMUX);
+
+    DL_GPIO_initDigitalOutput(GPIO_OLED_PIN_OLED_CS_IOMUX);
+
+    DL_GPIO_initDigitalOutput(GPIO_OLED_PIN_OLED_BLK_IOMUX);
+
     DL_GPIO_clearPins(GPIOA, MOTOR_MOTOR_LA_PIN |
 		MOTOR_MOTOR_LB_PIN);
     DL_GPIO_enableOutput(GPIOA, MOTOR_MOTOR_LA_PIN |
 		MOTOR_MOTOR_LB_PIN);
     DL_GPIO_clearPins(GPIOB, MOTOR_MOTOR_RA_PIN |
-		MOTOR_MOTOR_RB_PIN);
+		MOTOR_MOTOR_RB_PIN |
+		GPIO_OLED_PIN_OLED_DC_PIN);
+    DL_GPIO_setPins(GPIOB, GPIO_OLED_PIN_OLED_RES_PIN |
+		GPIO_OLED_PIN_OLED_CS_PIN |
+		GPIO_OLED_PIN_OLED_BLK_PIN);
     DL_GPIO_enableOutput(GPIOB, MOTOR_MOTOR_RA_PIN |
-		MOTOR_MOTOR_RB_PIN);
-    DL_GPIO_setLowerPinsPolarity(GPIOB, DL_GPIO_PIN_14_EDGE_FALL |
-		DL_GPIO_PIN_3_EDGE_RISE |
+		MOTOR_MOTOR_RB_PIN |
+		GPIO_OLED_PIN_OLED_RES_PIN |
+		GPIO_OLED_PIN_OLED_DC_PIN |
+		GPIO_OLED_PIN_OLED_CS_PIN |
+		GPIO_OLED_PIN_OLED_BLK_PIN);
+    DL_GPIO_setLowerPinsPolarity(GPIOB, DL_GPIO_PIN_3_EDGE_RISE |
 		DL_GPIO_PIN_6_EDGE_RISE);
-    DL_GPIO_clearInterruptStatus(GPIOB, GPIO_MPU6050_PIN_INT_PIN |
-		Encoder_PIN_LA_PIN |
+    DL_GPIO_clearInterruptStatus(GPIOB, Encoder_PIN_LA_PIN |
 		Encoder_PIN_RA_PIN);
-    DL_GPIO_enableInterrupt(GPIOB, GPIO_MPU6050_PIN_INT_PIN |
-		Encoder_PIN_LA_PIN |
+    DL_GPIO_enableInterrupt(GPIOB, Encoder_PIN_LA_PIN |
 		Encoder_PIN_RA_PIN);
 
 }
@@ -429,6 +457,8 @@ SYSCONFIG_WEAK void SYSCFG_DL_UART_BNO08_init(void)
     DL_UART_Main_enableInterrupt(UART_BNO08_INST,
                                  DL_UART_MAIN_INTERRUPT_RX);
 
+    /* Configure DMA Receive Event */
+    DL_UART_Main_enableDMAReceiveEvent(UART_BNO08_INST, DL_UART_DMA_INTERRUPT_RX);
 
     DL_UART_Main_enable(UART_BNO08_INST);
 }
@@ -537,4 +567,57 @@ SYSCONFIG_WEAK void SYSCFG_DL_UART_bj2_init(void)
 
     DL_UART_Main_enable(UART_bj2_INST);
 }
+
+static const DL_SPI_Config gSPI_OLED_config = {
+    .mode        = DL_SPI_MODE_CONTROLLER,
+    .frameFormat = DL_SPI_FRAME_FORMAT_MOTO4_POL0_PHA0,
+    .parity      = DL_SPI_PARITY_NONE,
+    .dataSize    = DL_SPI_DATA_SIZE_8,
+    .bitOrder    = DL_SPI_BIT_ORDER_MSB_FIRST,
+    .chipSelectPin = DL_SPI_CHIP_SELECT_0,
+};
+
+static const DL_SPI_ClockConfig gSPI_OLED_clockConfig = {
+    .clockSel    = DL_SPI_CLOCK_BUSCLK,
+    .divideRatio = DL_SPI_CLOCK_DIVIDE_RATIO_1
+};
+
+SYSCONFIG_WEAK void SYSCFG_DL_SPI_OLED_init(void) {
+    DL_SPI_setClockConfig(SPI_OLED_INST, (DL_SPI_ClockConfig *) &gSPI_OLED_clockConfig);
+
+    DL_SPI_init(SPI_OLED_INST, (DL_SPI_Config *) &gSPI_OLED_config);
+
+    /* Configure Controller mode */
+    /*
+     * Set the bit rate clock divider to generate the serial output clock
+     *     outputBitRate = (spiInputClock) / ((1 + SCR) * 2)
+     *     10000000 = (80000000)/((1 + 3) * 2)
+     */
+    DL_SPI_setBitRateSerialClockDivider(SPI_OLED_INST, 3);
+    /* Set RX and TX FIFO threshold levels */
+    DL_SPI_setFIFOThreshold(SPI_OLED_INST, DL_SPI_RX_FIFO_LEVEL_1_2_FULL, DL_SPI_TX_FIFO_LEVEL_1_2_EMPTY);
+
+    /* Enable module */
+    DL_SPI_enable(SPI_OLED_INST);
+}
+
+static const DL_DMA_Config gDMA_BNO08XConfig = {
+    .transferMode   = DL_DMA_SINGLE_TRANSFER_MODE,
+    .extendedMode   = DL_DMA_NORMAL_MODE,
+    .destIncrement  = DL_DMA_ADDR_UNCHANGED,
+    .srcIncrement   = DL_DMA_ADDR_UNCHANGED,
+    .destWidth      = DL_DMA_WIDTH_WORD,
+    .srcWidth       = DL_DMA_WIDTH_WORD,
+    .trigger        = UART_BNO08_INST_DMA_TRIGGER,
+    .triggerType    = DL_DMA_TRIGGER_TYPE_EXTERNAL,
+};
+
+SYSCONFIG_WEAK void SYSCFG_DL_DMA_BNO08X_init(void)
+{
+    DL_DMA_initChannel(DMA, DMA_BNO08X_CHAN_ID , (DL_DMA_Config *) &gDMA_BNO08XConfig);
+}
+SYSCONFIG_WEAK void SYSCFG_DL_DMA_init(void){
+    SYSCFG_DL_DMA_BNO08X_init();
+}
+
 

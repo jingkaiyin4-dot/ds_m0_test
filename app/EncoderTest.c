@@ -4,7 +4,7 @@
 #include "CameraControl.h"
 #include "Encoder.h"
 #include "Motor.h"
-#include "oled_hardware_i2c.h"
+#include "oled_hardware_spi.h"
 
 #include <stdint.h>
 
