@@ -225,6 +225,16 @@ extern "C" {
 /* Defines for PIN_TRANS_CAM_TOF: GPIOA.12 with pinCMx 34 on package pin 5 */
 #define GPIO_TRANS_PIN_TRANS_CAM_TOF_PIN                        (DL_GPIO_PIN_12)
 #define GPIO_TRANS_PIN_TRANS_CAM_TOF_IOMUX                       (IOMUX_PINCM34)
+/* Port definition for Pin Group GPIO_MPU6050 */
+#define GPIO_MPU6050_PORT                                                (GPIOA)
+
+/* Defines for PIN_MPU6050_INT: GPIOA.15 with pinCMx 37 on package pin 8 */
+// pins affected by this interrupt request:["PIN_MPU6050_INT"]
+#define GPIO_MPU6050_INT_IRQN                                   (GPIOA_INT_IRQn)
+#define GPIO_MPU6050_INT_IIDX                   (DL_INTERRUPT_GROUP1_IIDX_GPIOA)
+#define GPIO_MPU6050_PIN_MPU6050_INT_IIDX                   (DL_GPIO_IIDX_DIO15)
+#define GPIO_MPU6050_PIN_MPU6050_INT_PIN                        (DL_GPIO_PIN_15)
+#define GPIO_MPU6050_PIN_MPU6050_INT_IOMUX                       (IOMUX_PINCM37)
 /* Port definition for Pin Group Encoder */
 #define Encoder_PORT                                                     (GPIOB)
 

@@ -2,505 +2,255 @@
 
 #include <math.h>
 #include <stdint.h>
-#include <string.h>
 
 #include "clock.h"
 #include "mpu6050.h"
 #include "mspm0_i2c.h"
 
-#define BNO08X_I2C_ADDR                 (0x4BU)
-#define BNO08X_I2C_ALT_ADDR             (0x4AU)
+#define MPU6050_ADDR_LOW        (0x68U)
+#define MPU6050_ADDR_HIGH       (0x69U)
+#define MPU6050_REG_SMPLRT_DIV  (0x19U)
+#define MPU6050_REG_CONFIG      (0x1AU)
+#define MPU6050_REG_GYRO_CONFIG (0x1BU)
+#define MPU6050_REG_ACCEL_CONFIG (0x1CU)
+#define MPU6050_REG_INT_PIN_CFG  (0x37U)
+#define MPU6050_REG_INT_ENABLE  (0x38U)
+#define MPU6050_REG_ACCEL_XOUT_H (0x3BU)
+#define MPU6050_REG_PWR_MGMT_1  (0x6BU)
+#define MPU6050_REG_WHO_AM_I    (0x75U)
 
-#define BNO08X_CHANNEL_COMMAND          (0U)
-#define BNO08X_CHANNEL_EXECUTABLE       (1U)
-#define BNO08X_CHANNEL_CONTROL          (2U)
-#define BNO08X_CHANNEL_REPORTS          (3U)
+#define MPU6050_ACCEL_SCALE_2G  (16384.0f)
+#define MPU6050_GYRO_SCALE_250DPS (131.0f)
+#define MPU6050_FILTER_ALPHA    (0.96f)
+#define MPU6050_YAW_DEADBAND_DPS (1.2f)
+#define MPU6050_YAW_RETURN_RATE  (0.15f)
+#define MPU6050_YAW_BIAS_TRACK_ALPHA (0.02f)
 
-#define BNO08X_SHTP_REPORT_PRODUCT_ID_RESPONSE (0xF8U)
-#define BNO08X_SHTP_REPORT_PRODUCT_ID_REQUEST  (0xF9U)
-#define BNO08X_SHTP_REPORT_SET_FEATURE  (0xFDU)
-#define BNO08X_SHTP_REPORT_BASE_TS      (0xFBU)
+static uint8_t g_mpu6050_ready;
+static uint8_t g_mpu6050_last_whoami;
+static uint8_t g_mpu6050_addr;
+static volatile uint8_t g_mpu6050_sample_pending;
+static float g_mpu6050_yaw_bias_dps;
 
-#define BNO08X_SENSOR_ROTATION_VECTOR   (0x05U)
-#define BNO08X_SENSOR_GAME_RV           (0x08U)
-
-#define BNO08X_Q14_SCALE                (16384.0f)
-#define BNO08X_I2C_TIMEOUT_MS           (20U)
-#define BNO08X_STARTUP_DELAY_MS         (50U)
-#define BNO08X_PACKET_RETRY_COUNT       (30U)
-#define BNO08X_POLL_INTERVAL_MS         (20U)
-#define BNO08X_INIT_WAIT_MS             (800U)
-
-typedef struct {
-    I2C_Regs *i2c;
-    I2C_Regs *tryI2c;
-    uint8_t address;
-    uint8_t bus;
-    uint8_t tryAddress;
-    uint8_t tryBus;
-    uint8_t seqNum[6];
-    uint8_t rxBuf[128];
-    uint8_t txBuf[32];
-    uint8_t initialized;
-    uint8_t hasData;
-    uint8_t lastReportId;
-    uint8_t lastChannel;
-    uint8_t lastPayload0;
-    uint16_t lastPacketLen;
-} BNO08X_Context_t;
-
-static BNO08X_Context_t g_bno08x;
-
-unsigned long sensor_timestamp;
 short gyro[3], accel[3], sensors;
 float pitch, roll, yaw;
-BNO08X_Euler_t bno08x_euler;
-BNO08X_Quat_t bno08x_quat;
+MPU6050_Euler_t mpu6050_euler;
+MPU6050_Gyro_t mpu6050_gyro;
 
-static uint16_t BNO08X_Read16(const uint8_t *data)
+static int MPU6050_WriteReg(uint8_t reg, uint8_t value)
 {
-    return (uint16_t) data[0] | ((uint16_t) data[1] << 8);
+    return mspm0_i2c_write(g_mpu6050_addr, reg, 1U, &value);
 }
 
-static int16_t BNO08X_ReadS16(const uint8_t *data)
+static int MPU6050_ReadRegs(uint8_t reg, uint8_t *data, uint8_t length)
 {
-    return (int16_t) BNO08X_Read16(data);
+    return mspm0_i2c_read(g_mpu6050_addr, reg, length, data);
 }
 
-static void BNO08X_ResetOutputs(void)
+static int16_t MPU6050_ReadS16(const uint8_t *data)
 {
-    memset(&bno08x_euler, 0, sizeof(bno08x_euler));
-    memset(&bno08x_quat, 0, sizeof(bno08x_quat));
+    return (int16_t)(((uint16_t)data[0] << 8) | data[1]);
+}
+
+static float MPU6050_ApplyYawSuppression(float gz, float dt)
+{
+    float yawRate = gz - g_mpu6050_yaw_bias_dps;
+
+    if ((fabsf(mpu6050_gyro.x_dps) < 3.0f) &&
+        (fabsf(mpu6050_gyro.y_dps) < 3.0f) &&
+        (fabsf(gz) < 3.0f) &&
+        (fabsf(accel[0]) < 3000) &&
+        (fabsf(accel[1]) < 3000)) {
+        g_mpu6050_yaw_bias_dps += (gz - g_mpu6050_yaw_bias_dps) * MPU6050_YAW_BIAS_TRACK_ALPHA;
+        yawRate = gz - g_mpu6050_yaw_bias_dps;
+    }
+
+    if (fabsf(yawRate) < MPU6050_YAW_DEADBAND_DPS) {
+        yawRate = 0.0f;
+
+        if (fabsf(yaw) < MPU6050_YAW_RETURN_RATE) {
+            yaw = 0.0f;
+        } else if (yaw > 0.0f) {
+            yaw -= MPU6050_YAW_RETURN_RATE * dt;
+        } else {
+            yaw += MPU6050_YAW_RETURN_RATE * dt;
+        }
+    }
+
+    return yawRate;
+}
+
+static void MPU6050_ResetOutputs(void)
+{
+    uint8_t i;
+
+    for (i = 0; i < 3U; i++) {
+        accel[i] = 0;
+        gyro[i] = 0;
+    }
+
+    sensors = 0;
     pitch = 0.0f;
     roll = 0.0f;
     yaw = 0.0f;
-}
-
-static void BNO08X_QuaternionToEuler(float qr, float qi, float qj, float qk)
-{
-    float sqr = qr * qr;
-    float sqi = qi * qi;
-    float sqj = qj * qj;
-    float sqk = qk * qk;
-
-    yaw = atan2f(2.0f * (qi * qj + qk * qr), (sqi - sqj - sqk + sqr)) * 57.2957795f;
-    pitch = asinf(-2.0f * (qi * qk - qj * qr) / (sqi + sqj + sqk + sqr)) * 57.2957795f;
-    roll = atan2f(2.0f * (qj * qk + qi * qr), (-sqi - sqj + sqk + sqr)) * 57.2957795f;
-
-    bno08x_quat.real = qr;
-    bno08x_quat.i = qi;
-    bno08x_quat.j = qj;
-    bno08x_quat.k = qk;
-
-    bno08x_euler.yaw = yaw;
-    bno08x_euler.pitch = pitch;
-    bno08x_euler.roll = roll;
-}
-
-static int BNO08X_I2C_ReadRaw(BNO08X_Context_t *ctx, uint8_t *data, uint16_t length)
-{
-    uint16_t received = 0;
-    unsigned long startMs, nowMs;
-
-    if (length == 0U) {
-        return 0;
-    }
-
-    mspm0_get_clock_ms(&startMs);
-
-    while (!(DL_I2C_getControllerStatus(ctx->tryI2c) & DL_I2C_CONTROLLER_STATUS_IDLE)) {
-        mspm0_get_clock_ms(&nowMs);
-        if (nowMs >= (startMs + BNO08X_I2C_TIMEOUT_MS)) {
-            return -1;
-        }
-    }
-
-    DL_I2C_clearInterruptStatus(ctx->tryI2c, DL_I2C_INTERRUPT_CONTROLLER_RX_DONE);
-    DL_I2C_startControllerTransfer(ctx->tryI2c, ctx->tryAddress, DL_I2C_CONTROLLER_DIRECTION_RX, length);
-
-    while (received < length) {
-        if (!DL_I2C_isControllerRXFIFOEmpty(ctx->tryI2c)) {
-            data[received++] = DL_I2C_receiveControllerData(ctx->tryI2c);
-            continue;
-        }
-
-        mspm0_get_clock_ms(&nowMs);
-        if (nowMs >= (startMs + BNO08X_I2C_TIMEOUT_MS)) {
-            return -1;
-        }
-    }
-
-    return 0;
-}
-
-static int BNO08X_I2C_WriteRaw(BNO08X_Context_t *ctx, const uint8_t *data, uint16_t length)
-{
-    uint16_t sent = 0;
-    unsigned long startMs, nowMs;
-
-    if (length == 0U) {
-        return 0;
-    }
-
-    mspm0_get_clock_ms(&startMs);
-
-    while (!(DL_I2C_getControllerStatus(ctx->tryI2c) & DL_I2C_CONTROLLER_STATUS_IDLE)) {
-        mspm0_get_clock_ms(&nowMs);
-        if (nowMs >= (startMs + BNO08X_I2C_TIMEOUT_MS)) {
-            return -1;
-        }
-    }
-
-    DL_I2C_clearInterruptStatus(ctx->tryI2c, DL_I2C_INTERRUPT_CONTROLLER_TX_DONE);
-    DL_I2C_flushControllerTXFIFO(ctx->tryI2c);
-    sent += DL_I2C_fillControllerTXFIFO(ctx->tryI2c, data, length);
-    DL_I2C_startControllerTransfer(ctx->tryI2c, ctx->tryAddress, DL_I2C_CONTROLLER_DIRECTION_TX, length);
-
-    while (sent < length) {
-        uint16_t fillCnt = DL_I2C_fillControllerTXFIFO(ctx->tryI2c, &data[sent], length - sent);
-
-        if (fillCnt != 0U) {
-            sent += fillCnt;
-            continue;
-        }
-
-        mspm0_get_clock_ms(&nowMs);
-        if (nowMs >= (startMs + BNO08X_I2C_TIMEOUT_MS)) {
-            return -1;
-        }
-    }
-
-    while (!DL_I2C_getRawInterruptStatus(ctx->tryI2c, DL_I2C_INTERRUPT_CONTROLLER_TX_DONE)) {
-        mspm0_get_clock_ms(&nowMs);
-        if (nowMs >= (startMs + BNO08X_I2C_TIMEOUT_MS)) {
-            return -1;
-        }
-    }
-
-    return 0;
-}
-
-static int BNO08X_SoftReset(BNO08X_Context_t *ctx)
-{
-    static const uint8_t resetPacket[] = {0x05, 0x00, 0x01, 0x00, 0x01};
-
-    if (BNO08X_I2C_WriteRaw(ctx, resetPacket, sizeof(resetPacket)) != 0) {
-        return -1;
-    }
-    mspm0_delay_ms(50);
-    return 0;
-}
-
-static int BNO08X_SendPacket(BNO08X_Context_t *ctx, uint8_t channel, uint8_t payloadLen)
-{
-    uint8_t packet[32];
-    uint16_t totalLen = (uint16_t) payloadLen + 4U;
-
-    packet[0] = (uint8_t) (totalLen & 0xFFU);
-    packet[1] = (uint8_t) (totalLen >> 8);
-    packet[2] = channel;
-    packet[3] = ctx->seqNum[channel]++;
-    memcpy(&packet[4], ctx->txBuf, payloadLen);
-
-    return BNO08X_I2C_WriteRaw(ctx, packet, totalLen);
-}
-
-static int BNO08X_EnableReport(BNO08X_Context_t *ctx, uint8_t reportId, uint32_t intervalUs)
-{
-    memset(ctx->txBuf, 0, sizeof(ctx->txBuf));
-    ctx->txBuf[0] = BNO08X_SHTP_REPORT_SET_FEATURE;
-    ctx->txBuf[1] = reportId;
-    ctx->txBuf[2] = 0x00;
-    ctx->txBuf[3] = 0x00;
-    ctx->txBuf[4] = 0x00;
-    ctx->txBuf[5] = (uint8_t) (intervalUs & 0xFFU);
-    ctx->txBuf[6] = (uint8_t) ((intervalUs >> 8) & 0xFFU);
-    ctx->txBuf[7] = (uint8_t) ((intervalUs >> 16) & 0xFFU);
-    ctx->txBuf[8] = (uint8_t) ((intervalUs >> 24) & 0xFFU);
-
-    return BNO08X_SendPacket(ctx, BNO08X_CHANNEL_CONTROL, 17U);
-}
-
-static int BNO08X_RequestProductId(BNO08X_Context_t *ctx)
-{
-    memset(ctx->txBuf, 0, sizeof(ctx->txBuf));
-    ctx->txBuf[0] = BNO08X_SHTP_REPORT_PRODUCT_ID_REQUEST;
-    return BNO08X_SendPacket(ctx, BNO08X_CHANNEL_CONTROL, 2U);
-}
-
-static int BNO08X_ReadPacket(BNO08X_Context_t *ctx, uint16_t *packetLen)
-{
-    uint8_t header[4];
-    uint16_t totalLen;
-    uint16_t cargoLen;
-    uint16_t offset = 0;
-
-    memset(ctx->rxBuf, 0, sizeof(ctx->rxBuf));
-
-    if (BNO08X_I2C_ReadRaw(ctx, header, sizeof(header)) != 0) {
-        return -1;
-    }
-
-    totalLen = (uint16_t) header[0] | ((uint16_t) header[1] << 8);
-    totalLen &= (uint16_t) ~0x8000U;
-    if (totalLen < 4U) {
-        return -1;
-    }
-
-    memcpy(ctx->rxBuf, header, sizeof(header));
-    ctx->lastChannel = header[2];
-    ctx->lastPacketLen = totalLen;
-    cargoLen = totalLen - 4U;
-
-    while (cargoLen > 0U) {
-        uint16_t chunk = (cargoLen > 28U) ? 28U : cargoLen;
-        uint8_t temp[32];
-
-        if (BNO08X_I2C_ReadRaw(ctx, temp, (uint16_t) (chunk + 4U)) != 0) {
-            return -1;
-        }
-
-        memcpy(&ctx->rxBuf[4U + offset], &temp[4], chunk);
-        offset += chunk;
-        cargoLen -= chunk;
-    }
-
-    ctx->lastPayload0 = ctx->rxBuf[4];
-    if ((totalLen >= 10U) && (ctx->rxBuf[4] == BNO08X_SHTP_REPORT_BASE_TS)) {
-        ctx->lastReportId = ctx->rxBuf[9];
-    }
-
-    *packetLen = totalLen;
-    return 0;
-}
-
-static int BNO08X_WaitForReport(BNO08X_Context_t *ctx, uint16_t *packetLen)
-{
-    uint8_t retry;
-
-    for (retry = 0; retry < BNO08X_PACKET_RETRY_COUNT; retry++) {
-        if (BNO08X_ReadPacket(ctx, packetLen) != 0) {
-            continue;
-        }
-
-        if (ctx->rxBuf[2] == BNO08X_CHANNEL_REPORTS) {
-            return 0;
-        }
-
-        if ((ctx->rxBuf[2] == BNO08X_CHANNEL_CONTROL) && (ctx->rxBuf[4] == BNO08X_SHTP_REPORT_PRODUCT_ID_RESPONSE)) {
-            continue;
-        }
-    }
-
-    if (ctx->tryI2c == I2C_OLED_INST) {
-        SYSCFG_DL_I2C_OLED_init();
-    }
-
-    return -1;
-}
-
-static uint8_t BNO08X_DataReady(void)
-{
-    return (DL_GPIO_readPins(GPIOB, GPIO_MPU6050_PIN_INT_PIN) == 0U) ? 1U : 0U;
-}
-
-static int BNO08X_WaitForProductId(BNO08X_Context_t *ctx)
-{
-    unsigned long startMs;
-    unsigned long nowMs;
-    uint16_t packetLen;
-
-    mspm0_get_clock_ms(&startMs);
-
-    while (1) {
-        mspm0_get_clock_ms(&nowMs);
-        if ((nowMs - startMs) >= BNO08X_INIT_WAIT_MS) {
-            break;
-        }
-
-        if (BNO08X_ReadPacket(ctx, &packetLen) != 0) {
-            mspm0_delay_ms(2);
-            continue;
-        }
-
-        if ((packetLen >= 6U) && (ctx->rxBuf[2] == BNO08X_CHANNEL_CONTROL) && (ctx->rxBuf[4] == BNO08X_SHTP_REPORT_PRODUCT_ID_RESPONSE)) {
-            return 0;
-        }
-
-        mspm0_delay_ms(2);
-    }
-
-    return -1;
-}
-
-static int BNO08X_Open(BNO08X_Context_t *ctx, I2C_Regs *i2c, uint8_t bus, uint8_t address)
-{
-    memset(ctx->seqNum, 0, sizeof(ctx->seqNum));
-    ctx->tryI2c = i2c;
-    ctx->tryBus = bus;
-    ctx->tryAddress = address;
-
-    if (BNO08X_SoftReset(ctx) != 0) {
-        return -1;
-    }
-
-    mspm0_delay_ms(BNO08X_STARTUP_DELAY_MS);
-
-    /* Drain any startup advertisements before requesting product info. */
-    {
-        uint8_t flushCount;
-        uint16_t packetLen;
-
-        for (flushCount = 0; flushCount < 4U; flushCount++) {
-            if (BNO08X_ReadPacket(ctx, &packetLen) != 0) {
-                break;
-            }
-            mspm0_delay_ms(2);
-        }
-    }
-
-    if (BNO08X_RequestProductId(ctx) != 0) {
-        return -1;
-    }
-
-    if (BNO08X_WaitForProductId(ctx) != 0) {
-        return -1;
-    }
-
-    ctx->i2c = i2c;
-    ctx->bus = bus;
-    ctx->address = address;
-
-    if (ctx->i2c == I2C_OLED_INST) {
-        SYSCFG_DL_I2C_OLED_init();
-    }
-
-    return 0;
-}
-
-static int BNO08X_ParseSensorReport(BNO08X_Context_t *ctx, uint16_t packetLen)
-{
-    const uint8_t *payload = &ctx->rxBuf[4];
-    uint8_t channel = ctx->rxBuf[2];
-    uint8_t reportId;
-    float qi, qj, qk, qr;
-
-    if ((channel != BNO08X_CHANNEL_REPORTS) || (packetLen < 19U)) {
-        return -1;
-    }
-
-    if (payload[0] != BNO08X_SHTP_REPORT_BASE_TS) {
-        return -1;
-    }
-
-    reportId = payload[5];
-    if ((reportId != BNO08X_SENSOR_ROTATION_VECTOR) && (reportId != BNO08X_SENSOR_GAME_RV)) {
-        return -1;
-    }
-
-    qi = (float) BNO08X_ReadS16(&payload[9]) / BNO08X_Q14_SCALE;
-    qj = (float) BNO08X_ReadS16(&payload[11]) / BNO08X_Q14_SCALE;
-    qk = (float) BNO08X_ReadS16(&payload[13]) / BNO08X_Q14_SCALE;
-    qr = (float) BNO08X_ReadS16(&payload[15]) / BNO08X_Q14_SCALE;
-
-    BNO08X_QuaternionToEuler(qr, qi, qj, qk);
-    bno08x_euler.status = payload[7] & 0x03U;
-    bno08x_quat.status = payload[7] & 0x03U;
-    ctx->hasData = 1U;
-    ctx->lastReportId = reportId;
-    return 0;
+    g_mpu6050_yaw_bias_dps = 0.0f;
+
+    mpu6050_euler.pitch = 0.0f;
+    mpu6050_euler.roll = 0.0f;
+    mpu6050_euler.yaw = 0.0f;
+    mpu6050_euler.status = 0U;
+
+    mpu6050_gyro.x_dps = 0.0f;
+    mpu6050_gyro.y_dps = 0.0f;
+    mpu6050_gyro.z_dps = 0.0f;
 }
 
 void MPU6050_Init(void)
 {
-    memset(&g_bno08x, 0, sizeof(g_bno08x));
-    BNO08X_ResetOutputs();
+    uint8_t whoami = 0U;
 
-    if (BNO08X_Open(&g_bno08x, I2C_mpu_INST, 0U, BNO08X_I2C_ADDR) != 0) {
+    g_mpu6050_ready = 0U;
+    g_mpu6050_last_whoami = 0U;
+    g_mpu6050_addr = MPU6050_ADDR_LOW;
+    g_mpu6050_sample_pending = 0U;
+    MPU6050_ResetOutputs();
+
+    if (MPU6050_ReadRegs(MPU6050_REG_WHO_AM_I, &whoami, 1U) != 0) {
+        g_mpu6050_addr = MPU6050_ADDR_HIGH;
+        if (MPU6050_ReadRegs(MPU6050_REG_WHO_AM_I, &whoami, 1U) != 0) {
+            return;
+        }
+    }
+    g_mpu6050_last_whoami = whoami;
+
+    if ((whoami != MPU6050_ADDR_LOW) && (whoami != MPU6050_ADDR_HIGH)) {
         return;
     }
 
-    if (BNO08X_EnableReport(&g_bno08x, BNO08X_SENSOR_GAME_RV, 5000U) != 0) {
+    if (MPU6050_WriteReg(MPU6050_REG_PWR_MGMT_1, 0x00U) != 0) {
         return;
     }
-    mspm0_delay_ms(20);
-    g_bno08x.initialized = 1U;
+    mspm0_delay_ms(50);
+
+    if (MPU6050_WriteReg(MPU6050_REG_SMPLRT_DIV, 0x04U) != 0) {
+        return;
+    }
+    if (MPU6050_WriteReg(MPU6050_REG_CONFIG, 0x03U) != 0) {
+        return;
+    }
+    if (MPU6050_WriteReg(MPU6050_REG_GYRO_CONFIG, 0x00U) != 0) {
+        return;
+    }
+    if (MPU6050_WriteReg(MPU6050_REG_ACCEL_CONFIG, 0x00U) != 0) {
+        return;
+    }
+    if (MPU6050_WriteReg(MPU6050_REG_INT_PIN_CFG, 0x10U) != 0) {
+        return;
+    }
+    if (MPU6050_WriteReg(MPU6050_REG_INT_ENABLE, 0x01U) != 0) {
+        return;
+    }
+
+    g_mpu6050_ready = 1U;
+    g_mpu6050_sample_pending = 1U;
+    mpu6050_euler.status = 1U;
 }
 
 int Read_Quad(void)
 {
-    uint16_t packetLen;
-    static unsigned long lastPollMs = 0;
+    uint8_t raw[14];
+    float ax;
+    float ay;
+    float az;
+    float gx;
+    float gy;
+    float gz;
+    static unsigned long lastMs = 0U;
     unsigned long nowMs;
+    float dt;
+    float accelPitch;
+    float accelRoll;
 
-    if (g_bno08x.initialized == 0U) {
+    if (g_mpu6050_ready == 0U) {
         return -1;
     }
+
+    if (MPU6050_ReadRegs(MPU6050_REG_ACCEL_XOUT_H, raw, sizeof(raw)) != 0) {
+        return -1;
+    }
+
+    accel[0] = MPU6050_ReadS16(&raw[0]);
+    accel[1] = MPU6050_ReadS16(&raw[2]);
+    accel[2] = MPU6050_ReadS16(&raw[4]);
+    gyro[0] = MPU6050_ReadS16(&raw[8]);
+    gyro[1] = MPU6050_ReadS16(&raw[10]);
+    gyro[2] = MPU6050_ReadS16(&raw[12]);
+
+    ax = (float)accel[0] / MPU6050_ACCEL_SCALE_2G;
+    ay = (float)accel[1] / MPU6050_ACCEL_SCALE_2G;
+    az = (float)accel[2] / MPU6050_ACCEL_SCALE_2G;
+    gx = (float)gyro[0] / MPU6050_GYRO_SCALE_250DPS;
+    gy = (float)gyro[1] / MPU6050_GYRO_SCALE_250DPS;
+    gz = (float)gyro[2] / MPU6050_GYRO_SCALE_250DPS;
+
+    mpu6050_gyro.x_dps = gx;
+    mpu6050_gyro.y_dps = gy;
+    mpu6050_gyro.z_dps = gz;
+
+    accelPitch = atan2f(ay, sqrtf((ax * ax) + (az * az))) * 57.2957795f;
+    accelRoll = atan2f(-ax, az) * 57.2957795f;
 
     mspm0_get_clock_ms(&nowMs);
-    if ((BNO08X_DataReady() == 0U) && ((nowMs - lastPollMs) < BNO08X_POLL_INTERVAL_MS)) {
-        return 1;
+    if (lastMs == 0U) {
+        dt = 0.02f;
+    } else {
+        dt = (float)(nowMs - lastMs) / 1000.0f;
+        if (dt <= 0.0f) {
+            dt = 0.02f;
+        }
     }
-    lastPollMs = nowMs;
+    lastMs = nowMs;
 
-    if (BNO08X_WaitForReport(&g_bno08x, &packetLen) != 0) {
-        return -1;
-    }
+    pitch = (MPU6050_FILTER_ALPHA * (pitch + (gx * dt))) + ((1.0f - MPU6050_FILTER_ALPHA) * accelPitch);
+    roll = (MPU6050_FILTER_ALPHA * (roll + (gy * dt))) + ((1.0f - MPU6050_FILTER_ALPHA) * accelRoll);
+    gz = MPU6050_ApplyYawSuppression(gz, dt);
+    yaw += gz * dt;
 
-    return BNO08X_ParseSensorReport(&g_bno08x, packetLen);
+    mpu6050_euler.pitch = pitch;
+    mpu6050_euler.roll = roll;
+    mpu6050_euler.yaw = yaw;
+    mpu6050_euler.status = 1U;
+    sensors = 1;
+
+    return 0;
 }
 
-uint8_t BNO08X_IsReady(void)
+void MPU6050_OnInterrupt(void)
 {
-    return g_bno08x.initialized;
+    g_mpu6050_sample_pending = 1U;
 }
 
-uint8_t BNO08X_HasData(void)
+uint8_t MPU6050_HasPendingSample(void)
 {
-    return g_bno08x.hasData;
+    return g_mpu6050_sample_pending;
 }
 
-uint8_t BNO08X_GetBus(void)
+void MPU6050_ClearPendingSample(void)
 {
-    return g_bno08x.bus;
+    g_mpu6050_sample_pending = 0U;
 }
 
-uint8_t BNO08X_GetAddress(void)
+uint8_t MPU6050_IsReady(void)
 {
-    return g_bno08x.address;
+    return g_mpu6050_ready;
 }
 
-uint8_t BNO08X_GetTryBus(void)
+uint8_t MPU6050_GetWhoAmI(void)
 {
-    return g_bno08x.tryBus;
+    return g_mpu6050_last_whoami;
 }
 
-uint8_t BNO08X_GetTryAddress(void)
+uint8_t MPU6050_GetAddress(void)
 {
-    return g_bno08x.tryAddress;
-}
-
-uint8_t BNO08X_GetIntLevel(void)
-{
-    return (DL_GPIO_readPins(GPIOB, GPIO_MPU6050_PIN_INT_PIN) == 0U) ? 0U : 1U;
-}
-
-uint8_t BNO08X_GetLastChannel(void)
-{
-    return g_bno08x.lastChannel;
-}
-
-uint8_t BNO08X_GetLastPayload0(void)
-{
-    return g_bno08x.lastPayload0;
-}
-
-uint8_t BNO08X_GetLastReportId(void)
-{
-    return g_bno08x.lastReportId;
-}
-
-uint16_t BNO08X_GetLastPacketLen(void)
-{
-    return g_bno08x.lastPacketLen;
+    return g_mpu6050_addr;
 }

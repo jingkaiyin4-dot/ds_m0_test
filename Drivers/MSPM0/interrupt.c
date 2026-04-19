@@ -2,6 +2,7 @@
 #include "interrupt.h"
 #include "bno08x_uart_rvc.h"
 #include "clock.h"
+#include "Drivers/MPU6050/mpu6050.h"
 #include "wit.h"
 
 uint8_t enable_group1_irq = 0;
@@ -10,6 +11,7 @@ void Interrupt_Init(void)
 {
     if (enable_group1_irq) {
         NVIC_EnableIRQ(GPIOB_INT_IRQn);
+        NVIC_EnableIRQ(GPIOA_INT_IRQn);
     }
 }
 
@@ -112,20 +114,14 @@ void UART_WIT_INST_IRQHandler(void)
 }
 #endif
 
-// void GROUP1_IRQHandler(void)
-// {
-//     switch (DL_Interrupt_getPendingGroup(DL_INTERRUPT_GROUP_1)) {
-//         /* MPU6050 INT */
-//         #if defined GPIO_MPU6050_PORT
-//             #if defined GPIO_MPU6050_INT_IIDX
-//             case GPIO_MPU6050_INT_IIDX:
-//             #elif (GPIO_MPU6050_PORT == GPIOA) && (defined GPIO_MULTIPLE_GPIOA_INT_IIDX)
-//             case GPIO_MULTIPLE_GPIOA_INT_IIDX:
-//             #elif (GPIO_MPU6050_PORT == GPIOB) && (defined GPIO_MULTIPLE_GPIOB_INT_IIDX)
-//             case GPIO_MULTIPLE_GPIOB_INT_IIDX:
-//             #endif
-//                 Read_Quad();
-//                 break;
-//         #endif
-//     }
-// }
+void GPIOA_IRQHandler(void)
+{
+    switch (DL_GPIO_getPendingInterrupt(GPIOA)) {
+        case DL_GPIO_IIDX_DIO15:
+            MPU6050_OnInterrupt();
+            DL_GPIO_clearInterruptStatus(GPIOA, GPIO_MPU6050_PIN_MPU6050_INT_PIN);
+            break;
+        default:
+            break;
+    }
+}

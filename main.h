@@ -9,6 +9,7 @@
 #include "ultrasonic_capture.h"
 #include "ultrasonic_gpio.h"
 #include "bno08x_uart_rvc.h"
+#include "Drivers/MPU6050/mpu6050.h"
 #include "tof400f.h"
 #include "app/CameraControl.h"
 

@@ -38,16 +38,28 @@ static uint8_t oled_buffer[32];
 static uint16_t tof400f_distance_mm;
 static uint8_t tof400f_ok;
 static uint8_t uart_cam_use_tof;
+static uint8_t imu_use_bno08x;
 static unsigned long now_ms;
+static unsigned long imu_sample_ms;
+
+#ifndef APP_USE_BNO08X
+#define APP_USE_BNO08X 0U
+#endif
 
 int main(void)
 {
     SYSCFG_DL_init();
     SysTick_Init();
     OLED_Init();
-    BNO08X_Init();
     CameraControl_Init();
     TOF400F_Init();
+
+    imu_use_bno08x = APP_USE_BNO08X;
+    if (imu_use_bno08x != 0U) {
+        BNO08X_Init();
+    } else {
+        MPU6050_Init();
+    }
 
     uart_cam_use_tof = (DL_GPIO_readPins(GPIO_TRANS_PORT, GPIO_TRANS_PIN_TRANS_CAM_TOF_PIN) != 0U) ? 1U : 0U;
     if (uart_cam_use_tof != 0U) {
@@ -61,7 +73,11 @@ int main(void)
     enable_group1_irq = 1U;
     Interrupt_Init();
 
-    OLED_ShowString(0,7,(uint8_t *)"BNO08X",8);
+    if (imu_use_bno08x != 0U) {
+        OLED_ShowString(0,7,(uint8_t *)"BNO08X",8);
+    } else {
+        OLED_ShowString(0,7,(uint8_t *)"MPU6050",8);
+    }
     OLED_ShowString(0,0,(uint8_t *)"Pitch",8);
     OLED_ShowString(0,2,(uint8_t *)" Roll",8);
     OLED_ShowString(0,4,(uint8_t *)"  Yaw",8);
@@ -73,6 +89,7 @@ int main(void)
     }
 
     tof400f_ok = 0;
+    imu_sample_ms = 0U;
     if (uart_cam_use_tof != 0U) {
         TOF400F_Query();
     }
@@ -86,6 +103,14 @@ int main(void)
         }
 
         mspm0_get_clock_ms(&now_ms);
+        if ((imu_use_bno08x == 0U) && (MPU6050_IsReady() != 0U)) {
+            if ((MPU6050_HasPendingSample() != 0U) || ((now_ms - imu_sample_ms) >= 20U)) {
+                MPU6050_ClearPendingSample();
+                Read_Quad();
+                imu_sample_ms = now_ms;
+            }
+        }
+
         if ((uart_cam_use_tof != 0U) && ((now_ms - tof400f_query_ms) >= 100U)) {
             tof400f_query_ms = now_ms;
             TOF400F_Query();
@@ -105,16 +130,40 @@ int main(void)
         }
         OLED_ShowString(24,6,oled_buffer,8);
 
-        sprintf((char *)oled_buffer, "%-6.1f", bno08x_data.pitch);
+        if (imu_use_bno08x != 0U) {
+            sprintf((char *)oled_buffer, "%-6.1f", bno08x_data.pitch);
+        } else {
+            if (MPU6050_IsReady() != 0U) {
+                sprintf((char *)oled_buffer, "%-6.1f", mpu6050_euler.pitch);
+            } else {
+                sprintf((char *)oled_buffer, "W%02X A%02X", MPU6050_GetWhoAmI(), MPU6050_GetAddress());
+            }
+        }
         OLED_ShowString(5*8,0,oled_buffer,16);
-        sprintf((char *)oled_buffer, "%-6.1f", bno08x_data.roll);
+        if (imu_use_bno08x != 0U) {
+            sprintf((char *)oled_buffer, "%-6.1f", bno08x_data.roll);
+        } else {
+            if (MPU6050_IsReady() != 0U) {
+                sprintf((char *)oled_buffer, "%-6.1f", mpu6050_euler.roll);
+            } else {
+                sprintf((char *)oled_buffer, "GY%5.1f", mpu6050_gyro.y_dps);
+            }
+        }
         OLED_ShowString(5*8,2,oled_buffer,16);
-        sprintf((char *)oled_buffer, "%-6.1f", bno08x_data.yaw);
+        if (imu_use_bno08x != 0U) {
+            sprintf((char *)oled_buffer, "%-6.1f", bno08x_data.yaw);
+        } else {
+            if (MPU6050_IsReady() != 0U) {
+                sprintf((char *)oled_buffer, "%-6.1f", mpu6050_euler.yaw);
+            } else {
+                sprintf((char *)oled_buffer, "RD%1u", MPU6050_IsReady());
+            }
+        }
         OLED_ShowString(5*8,4,oled_buffer,16);
 
-        sprintf((char *)oled_buffer, "%c/%1u", (uart_cam_use_tof != 0U) ? 'T' : 'C', uart_cam_use_tof);
+        sprintf((char *)oled_buffer, "%c%c", (imu_use_bno08x != 0U) ? 'B' : 'M', (uart_cam_use_tof != 0U) ? 'T' : 'C');
         OLED_ShowString(96,6,oled_buffer,8);
 
-        mspm0_delay_ms(50);
+        mspm0_delay_ms(10);
     }
 }
