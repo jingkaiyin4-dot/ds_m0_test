@@ -50,6 +50,7 @@
                                     <listOptionValue value="${PROJECT_ROOT}/Drivers/Ultrasonic_GPIO"/>
                                     <listOptionValue value="${PROJECT_ROOT}/Drivers/Ultrasonic_Capture"/>
                                     <listOptionValue value="${PROJECT_ROOT}/Drivers/OLED_Hardware_I2C"/>
+                                    <listOptionValue value="${PROJECT_ROOT}/Drivers/TOF400F"/>
                                     <listOptionValue value="${PROJECT_ROOT}/Drivers/OLED_Hardware_SPI"/>
                                     <listOptionValue value="${PROJECT_ROOT}/Drivers/OLED_Software_I2C"/>
                                     <listOptionValue value="${PROJECT_ROOT}/Drivers/OLED_Software_SPI"/>

@@ -1,30 +1,81 @@
 #include "CameraControl.h"
 
+#include "UART1.h"
+#include "clock.h"
 #include "ti_msp_dl_config.h"
-#include "Motor.h"
+#include "ZdtStepper.h"
 
 #include <stdbool.h>
 
-#define CAMERA_CONTROL_LEFT_DUTY (50)
+#define CAMERA_STEPPER_ADDR_1 (1U)
+#define CAMERA_STEPPER_ADDR_2 (2U)
+#define CAMERA_STEPPER_ACC    (25U)
+#define CAMERA_STEPPER_VEL    (1500.0f)
 
 static volatile uint8_t g_pendingCommand;
 static volatile bool g_hasPendingCommand;
+static volatile uint8_t g_lastRawByte;
 static uint8_t g_lastCommand = '-';
-static int16_t g_leftMotorDuty;
+static uint8_t g_stepperRunning;
+
+static void CameraControl_OnRxByte(uint8_t rxByte);
+
+static void CameraControl_StartSteppers(void)
+{
+    ZdtStepper_EnControl(ZDT_STEPPER_BJ1, CAMERA_STEPPER_ADDR_1, true, false);
+    mspm0_delay_ms(2);
+    ZdtStepper_EnControl(ZDT_STEPPER_BJ2, CAMERA_STEPPER_ADDR_2, true, false);
+    mspm0_delay_ms(10);
+    ZdtStepper_GimbalSetVelocity(CAMERA_STEPPER_VEL, CAMERA_STEPPER_VEL);
+
+    g_stepperRunning = 1U;
+}
+
+static void CameraControl_StopSteppers(void)
+{
+    ZdtStepper_GimbalEmergencyStop();
+    g_stepperRunning = 0U;
+}
+
+void CameraControl_Start(void)
+{
+    CameraControl_StartSteppers();
+    g_lastCommand = '1';
+}
+
+void CameraControl_Stop(void)
+{
+    CameraControl_StopSteppers();
+    g_lastCommand = '2';
+}
 
 void CameraControl_Init(void)
 {
-    uint8_t dummy[4];
-
     g_pendingCommand = 0U;
     g_hasPendingCommand = false;
+    g_lastRawByte = 0U;
     g_lastCommand = '-';
-    g_leftMotorDuty = 0;
+    g_stepperRunning = 0U;
 
-    Motor_StopAll();
-    DL_UART_drainRXFIFO(UART_CAM_INST, dummy, 4);
-    NVIC_ClearPendingIRQ(UART_CAM_INST_INT_IRQN);
-    NVIC_EnableIRQ(UART_CAM_INST_INT_IRQN);
+    ZdtStepper_Init();
+    CameraControl_StopSteppers();
+    UART_CAM_ServiceInit();
+    UART_CAM_RegisterHandler(UART_CAM_MODE_CAMERA_CONTROL, CameraControl_OnRxByte);
+}
+
+void CameraControl_EnableUart(void)
+{
+    g_pendingCommand = 0U;
+    g_hasPendingCommand = false;
+    g_lastRawByte = 0U;
+    UART_CAM_SelectMode(UART_CAM_MODE_CAMERA_CONTROL);
+}
+
+void CameraControl_DisableUart(void)
+{
+    if (UART_CAM_GetMode() == UART_CAM_MODE_CAMERA_CONTROL) {
+        UART_CAM_SelectMode(UART_CAM_MODE_NONE);
+    }
 }
 
 void CameraControl_Process(void)
@@ -41,16 +92,12 @@ void CameraControl_Process(void)
     __enable_irq();
 
     if (command == '1') {
-        g_leftMotorDuty = CAMERA_CONTROL_LEFT_DUTY;
-        Motor_SetDuty(MOTOR_LEFT, g_leftMotorDuty);
+        CameraControl_Start();
     } else if (command == '2') {
-        g_leftMotorDuty = 0;
-        Motor_SetDuty(MOTOR_LEFT, 0);
+        CameraControl_Stop();
     } else {
         return;
     }
-
-    g_lastCommand = command;
 }
 
 uint8_t CameraControl_GetLastCommand(void)
@@ -58,15 +105,33 @@ uint8_t CameraControl_GetLastCommand(void)
     return g_lastCommand;
 }
 
-int16_t CameraControl_GetLeftMotorDuty(void)
+uint8_t CameraControl_GetPendingCommand(void)
 {
-    return g_leftMotorDuty;
+    return g_pendingCommand;
 }
 
-void UART_CAM_INST_IRQHandler(void)
+uint8_t CameraControl_IsStepperRunning(void)
 {
-    while (DL_UART_Main_isRXFIFOEmpty(UART_CAM_INST) == false) {
-        g_pendingCommand = DL_UART_Main_receiveData(UART_CAM_INST);
+    return g_stepperRunning;
+}
+
+uint8_t CameraControl_GetLastRawByte(void)
+{
+    return g_lastRawByte;
+}
+
+int16_t CameraControl_GetLeftMotorDuty(void)
+{
+    return (g_stepperRunning != 0U) ? 1 : 0;
+}
+
+static void CameraControl_OnRxByte(uint8_t rxByte)
+{
+    g_lastRawByte = rxByte;
+
+    /* Ignore CR/LF from serial tools and only latch valid commands. */
+    if ((rxByte == '1') || (rxByte == '2')) {
+        g_pendingCommand = rxByte;
         g_hasPendingCommand = true;
     }
 }

@@ -35,6 +35,10 @@
 #include "stdio.h"
 
 static uint8_t oled_buffer[32];
+static uint16_t tof400f_distance_mm;
+static uint8_t tof400f_ok;
+static uint8_t uart_cam_use_tof;
+static unsigned long now_ms;
 
 int main(void)
 {
@@ -42,21 +46,64 @@ int main(void)
     SysTick_Init();
     OLED_Init();
     BNO08X_Init();
+    CameraControl_Init();
+    TOF400F_Init();
+
+    uart_cam_use_tof = (DL_GPIO_readPins(GPIO_TRANS_PORT, GPIO_TRANS_PIN_TRANS_CAM_TOF_PIN) != 0U) ? 1U : 0U;
+    if (uart_cam_use_tof != 0U) {
+        CameraControl_DisableUart();
+        TOF400F_EnableUart();
+    } else {
+        TOF400F_DisableUart();
+        CameraControl_EnableUart();
+    }
 
     enable_group1_irq = 1U;
     Interrupt_Init();
 
-    OLED_ShowString(0,7,(uint8_t *)"BNO08X Demo",8);
+    OLED_ShowString(0,7,(uint8_t *)"BNO08X",8);
     OLED_ShowString(0,0,(uint8_t *)"Pitch",8);
     OLED_ShowString(0,2,(uint8_t *)" Roll",8);
     OLED_ShowString(0,4,(uint8_t *)"  Yaw",8);
-    OLED_ShowString(16*6,7,(uint8_t *)"Index",8);
-    OLED_ShowString(16*6,0,(uint8_t *)"Accel",8);
+    OLED_ShowString(72,6,(uint8_t *)"C/R",8);
+    if (uart_cam_use_tof != 0U) {
+        OLED_ShowString(0,6,(uint8_t *)"TOF",8);
+    } else {
+        OLED_ShowString(0,6,(uint8_t *)"CAM",8);
+    }
 
-    while (1) 
+    tof400f_ok = 0;
+    if (uart_cam_use_tof != 0U) {
+        TOF400F_Query();
+    }
+
+    static unsigned long tof400f_query_ms = 0;
+
+    while (1)
     {
-        sprintf((char *)oled_buffer, "%3u", bno08x_data.index);
-        OLED_ShowString(18*6,6,oled_buffer,8);
+        if (uart_cam_use_tof == 0U) {
+            CameraControl_Process();
+        }
+
+        mspm0_get_clock_ms(&now_ms);
+        if ((uart_cam_use_tof != 0U) && ((now_ms - tof400f_query_ms) >= 100U)) {
+            tof400f_query_ms = now_ms;
+            TOF400F_Query();
+        }
+
+        if (uart_cam_use_tof != 0U) {
+            tof400f_ok = TOF400F_IsReady();
+
+            if (tof400f_ok != 0U) {
+                tof400f_distance_mm = TOF400F_ReadDistanceMm();
+                sprintf((char *)oled_buffer, "%4umm", (unsigned int)tof400f_distance_mm);
+            } else {
+                sprintf((char *)oled_buffer, "I%u C%02X", (unsigned int)TOF400F_GetIrqCount(), TOF400F_GetLastChar());
+            }
+        } else {
+            sprintf((char *)oled_buffer, "%c %02X/%1u", CameraControl_GetLastCommand(), CameraControl_GetPendingCommand(), CameraControl_IsStepperRunning());
+        }
+        OLED_ShowString(24,6,oled_buffer,8);
 
         sprintf((char *)oled_buffer, "%-6.1f", bno08x_data.pitch);
         OLED_ShowString(5*8,0,oled_buffer,16);
@@ -65,12 +112,8 @@ int main(void)
         sprintf((char *)oled_buffer, "%-6.1f", bno08x_data.yaw);
         OLED_ShowString(5*8,4,oled_buffer,16);
 
-        sprintf((char *)oled_buffer, "%6d", bno08x_data.ax);
-        OLED_ShowString(15*6,1,oled_buffer,8);
-        sprintf((char *)oled_buffer, "%6d", bno08x_data.ay);
-        OLED_ShowString(15*6,2,oled_buffer,8);
-        sprintf((char *)oled_buffer, "%6d", bno08x_data.az);
-        OLED_ShowString(15*6,3,oled_buffer,8);
+        sprintf((char *)oled_buffer, "%c/%1u", (uart_cam_use_tof != 0U) ? 'T' : 'C', uart_cam_use_tof);
+        OLED_ShowString(96,6,oled_buffer,8);
 
         mspm0_delay_ms(50);
     }

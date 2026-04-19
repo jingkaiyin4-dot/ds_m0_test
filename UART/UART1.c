@@ -1,64 +1,79 @@
+#include "UART1.h"
+
 #include "ti_msp_dl_config.h"
 
-#if 0
+static UART_CAM_RxHandler g_uart_cam_handlers[3];
+static UART_CAM_Mode g_uart_cam_mode = UART_CAM_MODE_NONE;
+static uint8_t g_uart_cam_initialized = 0U;
 
-uint8_t Serial_TxPacket[4];         // 定义发送数据包数组，数据包格式：FF 01 02 03 04 FE
-uint8_t Serial_RxPacket[4];         // 定义接收数据包数组（16进制）
-uint32_t Serial_RxPacket_Decimal[4]; // 新增：定义接收数据包数组（10进制）
-uint8_t Serial_RxFlag;              // 定义接收数据包标志位
-int a;
-void UART1_Init()
+void UART_CAM_ServiceInit(void)
 {
-  
+    if (g_uart_cam_initialized != 0U) {
+        return;
+    }
 
-    SYSCFG_DL_UART_1l_init(); // 添加硬件配置
-    NVIC_EnableIRQ(UART_1l_INST_INT_IRQN);
-
-    NVIC_ClearPendingIRQ(UART_1l_INST_INT_IRQN);
-   
+    SYSCFG_DL_UART_CAM_init();
+    NVIC_ClearPendingIRQ(UART_CAM_INST_INT_IRQN);
+    NVIC_EnableIRQ(UART_CAM_INST_INT_IRQN);
+    g_uart_cam_initialized = 1U;
 }
 
-void UART_1l_INST_IRQHandler(void)
+void UART_CAM_RegisterHandler(UART_CAM_Mode mode, UART_CAM_RxHandler handler)
 {
-    static uint8_t RxState = 0;     // 定义表示当前状态机状态的静态变量
-    static uint8_t pRxPacket = 0;   // 定义表示当前接收数据位置的静态变量
-     a++;
-    uint8_t RxData = DL_UART_Main_receiveData(UART_1l_INST);                
-        
-    if (RxState == 0)
-    {
-        if (RxData == 0xFF)         // 如果数据确实是包头
-        {
-            RxState = 1;            // 置下一个状态
-            pRxPacket = 0;          // 数据包的位置归零
-        }
-    }
-    /* 当前状态为1，接收数据包数据 */
-    else if (RxState == 1)
-    {
-        Serial_RxPacket[pRxPacket] = RxData;    // 将数据存入数据包数组的指定位置
-        pRxPacket++;                // 数据包的位置自增
-        if (pRxPacket >= 4)         // 如果收够4个数据
-        {
-            RxState = 2;            // 置下一个状态
-        }
-    }
-    /* 当前状态为2，接收数据包包尾 */
-    else if (RxState == 2)
-    {
-        if (RxData == 0xFE)         // 如果数据确实是包尾部
-        {
-            RxState = 0;            // 状态归0
-            
-            // 新增：将16进制数据转换为10进制
-            for (uint8_t i = 0; i < 4; i++)
-            {
-                Serial_RxPacket_Decimal[i] = (uint32_t)Serial_RxPacket[i];
-            }
-            
-            Serial_RxFlag = 1;      // 接收数据包标志位置1，成功接收一个数据包
-        }
+    if ((uint32_t)mode < (sizeof(g_uart_cam_handlers) / sizeof(g_uart_cam_handlers[0]))) {
+        g_uart_cam_handlers[(uint32_t)mode] = handler;
     }
 }
 
-#endif
+void UART_CAM_SelectMode(UART_CAM_Mode mode)
+{
+    UART_CAM_ServiceInit();
+    g_uart_cam_mode = mode;
+    UART_CAM_ClearRxFifo();
+    NVIC_ClearPendingIRQ(UART_CAM_INST_INT_IRQN);
+}
+
+UART_CAM_Mode UART_CAM_GetMode(void)
+{
+    return g_uart_cam_mode;
+}
+
+void UART_CAM_ClearRxFifo(void)
+{
+    uint8_t dummy[8];
+
+    DL_UART_drainRXFIFO(UART_CAM_INST, dummy, sizeof(dummy));
+}
+
+void UART_CAM_SendByte(uint8_t data)
+{
+    UART_CAM_ServiceInit();
+    DL_UART_transmitData(UART_CAM_INST, data);
+}
+
+void UART_CAM_SendBuffer(const uint8_t *data, uint8_t length)
+{
+    uint8_t i;
+
+    UART_CAM_ServiceInit();
+    for (i = 0; i < length; i++) {
+        DL_UART_transmitData(UART_CAM_INST, data[i]);
+    }
+}
+
+void UART_CAM_INST_IRQHandler(void)
+{
+    UART_CAM_RxHandler handler = 0;
+
+    if ((uint32_t)g_uart_cam_mode < (sizeof(g_uart_cam_handlers) / sizeof(g_uart_cam_handlers[0]))) {
+        handler = g_uart_cam_handlers[(uint32_t)g_uart_cam_mode];
+    }
+
+    while (DL_UART_Main_isRXFIFOEmpty(UART_CAM_INST) == false) {
+        uint8_t data = DL_UART_Main_receiveData(UART_CAM_INST);
+
+        if (handler != 0) {
+            handler(data);
+        }
+    }
+}

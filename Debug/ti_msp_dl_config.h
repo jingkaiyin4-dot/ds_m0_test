@@ -107,33 +107,19 @@ extern "C" {
 
 
 
-/* Defines for I2C_OLED */
-#define I2C_OLED_INST                                                       I2C1
-#define I2C_OLED_INST_IRQHandler                                 I2C1_IRQHandler
-#define I2C_OLED_INST_INT_IRQN                                     I2C1_INT_IRQn
-#define I2C_OLED_BUS_SPEED_HZ                                             400000
-#define GPIO_I2C_OLED_SDA_PORT                                             GPIOA
-#define GPIO_I2C_OLED_SDA_PIN                                     DL_GPIO_PIN_10
-#define GPIO_I2C_OLED_IOMUX_SDA                                  (IOMUX_PINCM21)
-#define GPIO_I2C_OLED_IOMUX_SDA_FUNC                   IOMUX_PINCM21_PF_I2C1_SDA
-#define GPIO_I2C_OLED_SCL_PORT                                             GPIOA
-#define GPIO_I2C_OLED_SCL_PIN                                     DL_GPIO_PIN_11
-#define GPIO_I2C_OLED_IOMUX_SCL                                  (IOMUX_PINCM22)
-#define GPIO_I2C_OLED_IOMUX_SCL_FUNC                   IOMUX_PINCM22_PF_I2C1_SCL
-
-/* Defines for I2C_mpu */
-#define I2C_mpu_INST                                                        I2C0
-#define I2C_mpu_INST_IRQHandler                                  I2C0_IRQHandler
-#define I2C_mpu_INST_INT_IRQN                                      I2C0_INT_IRQn
-#define I2C_mpu_BUS_SPEED_HZ                                              400000
-#define GPIO_I2C_mpu_SDA_PORT                                              GPIOA
-#define GPIO_I2C_mpu_SDA_PIN                                      DL_GPIO_PIN_28
-#define GPIO_I2C_mpu_IOMUX_SDA                                    (IOMUX_PINCM3)
-#define GPIO_I2C_mpu_IOMUX_SDA_FUNC                     IOMUX_PINCM3_PF_I2C0_SDA
-#define GPIO_I2C_mpu_SCL_PORT                                              GPIOA
-#define GPIO_I2C_mpu_SCL_PIN                                      DL_GPIO_PIN_31
-#define GPIO_I2C_mpu_IOMUX_SCL                                    (IOMUX_PINCM6)
-#define GPIO_I2C_mpu_IOMUX_SCL_FUNC                     IOMUX_PINCM6_PF_I2C0_SCL
+/* Defines for I2C_MPU6050 */
+#define I2C_MPU6050_INST                                                    I2C0
+#define I2C_MPU6050_INST_IRQHandler                              I2C0_IRQHandler
+#define I2C_MPU6050_INST_INT_IRQN                                  I2C0_INT_IRQn
+#define I2C_MPU6050_BUS_SPEED_HZ                                          400000
+#define GPIO_I2C_MPU6050_SDA_PORT                                          GPIOA
+#define GPIO_I2C_MPU6050_SDA_PIN                                  DL_GPIO_PIN_28
+#define GPIO_I2C_MPU6050_IOMUX_SDA                                (IOMUX_PINCM3)
+#define GPIO_I2C_MPU6050_IOMUX_SDA_FUNC                 IOMUX_PINCM3_PF_I2C0_SDA
+#define GPIO_I2C_MPU6050_SCL_PORT                                          GPIOA
+#define GPIO_I2C_MPU6050_SCL_PIN                                  DL_GPIO_PIN_31
+#define GPIO_I2C_MPU6050_IOMUX_SCL                                (IOMUX_PINCM6)
+#define GPIO_I2C_MPU6050_IOMUX_SCL_FUNC                 IOMUX_PINCM6_PF_I2C0_SCL
 
 
 /* Defines for UART_BNO08 */
@@ -165,9 +151,9 @@ extern "C" {
 #define GPIO_UART_CAM_IOMUX_TX                                   (IOMUX_PINCM19)
 #define GPIO_UART_CAM_IOMUX_RX_FUNC                    IOMUX_PINCM20_PF_UART1_RX
 #define GPIO_UART_CAM_IOMUX_TX_FUNC                    IOMUX_PINCM19_PF_UART1_TX
-#define UART_CAM_BAUD_RATE                                                (9600)
-#define UART_CAM_IBRD_40_MHZ_9600_BAUD                                     (260)
-#define UART_CAM_FBRD_40_MHZ_9600_BAUD                                      (27)
+#define UART_CAM_BAUD_RATE                                              (115200)
+#define UART_CAM_IBRD_40_MHZ_115200_BAUD                                    (21)
+#define UART_CAM_FBRD_40_MHZ_115200_BAUD                                    (45)
 /* Defines for UART_bj1 */
 #define UART_bj1_INST                                                      UART3
 #define UART_bj1_INST_FREQUENCY                                         80000000
@@ -233,6 +219,12 @@ extern "C" {
 #define UART_BNO08_INST_DMA_TRIGGER                          (DMA_UART2_RX_TRIG)
 
 
+/* Port definition for Pin Group GPIO_TRANS */
+#define GPIO_TRANS_PORT                                                  (GPIOA)
+
+/* Defines for PIN_TRANS_CAM_TOF: GPIOA.12 with pinCMx 34 on package pin 5 */
+#define GPIO_TRANS_PIN_TRANS_CAM_TOF_PIN                        (DL_GPIO_PIN_12)
+#define GPIO_TRANS_PIN_TRANS_CAM_TOF_IOMUX                       (IOMUX_PINCM34)
 /* Port definition for Pin Group Encoder */
 #define Encoder_PORT                                                     (GPIOB)
 
@@ -293,8 +285,7 @@ void SYSCFG_DL_GPIO_init(void);
 void SYSCFG_DL_SYSCTL_init(void);
 void SYSCFG_DL_Motor_init(void);
 void SYSCFG_DL_TIMER_0_init(void);
-void SYSCFG_DL_I2C_OLED_init(void);
-void SYSCFG_DL_I2C_mpu_init(void);
+void SYSCFG_DL_I2C_MPU6050_init(void);
 void SYSCFG_DL_UART_BNO08_init(void);
 void SYSCFG_DL_UART_CAM_init(void);
 void SYSCFG_DL_UART_bj1_init(void);
