@@ -39,8 +39,18 @@ void ZdtStepper_GimbalMoveDistance(float yaw_deg, float pitch_deg, float vel);
 void ZdtStepper_GimbalEmergencyStop(void);
 void ZdtStepper_ReadVel(ZdtStepperPort port, uint8_t addr);
 bool ZdtStepper_ParseVel(ZdtStepperPort port, float *vel);
+void ZdtStepper_ReadPos(ZdtStepperPort port, uint8_t addr);
+bool ZdtStepper_ParsePos(ZdtStepperPort port, int32_t *pos);
+void ZdtStepper_ReadFlag(ZdtStepperPort port, uint8_t addr);
+bool ZdtStepper_ParseFlag(ZdtStepperPort port, uint8_t *flag);
+void ZdtStepper_ReadIo(ZdtStepperPort port, uint8_t addr);
+bool ZdtStepper_ParseIo(ZdtStepperPort port, uint8_t *io);
 uint32_t ZdtStepper_GetTxTimeoutCount(ZdtStepperPort port);
 uint8_t ZdtStepper_GetRxCount(ZdtStepperPort port);
 uint8_t ZdtStepper_GetRxByte(ZdtStepperPort port, uint8_t index);
+uint8_t ZdtStepper_GetLastFrameCount(ZdtStepperPort port);
+uint8_t ZdtStepper_GetLastFrameCmd(ZdtStepperPort port);
+uint8_t ZdtStepper_GetLastFrameByte(ZdtStepperPort port, uint8_t index);
+uint8_t ZdtStepper_GetPendingRxCount(ZdtStepperPort port);
 
 #endif

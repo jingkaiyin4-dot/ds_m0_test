@@ -22,6 +22,15 @@
 #define OLED_CMD  0	//写命令
 #define OLED_DATA 1	//写数据
 
+#define OLED_COLOR_BLACK   0x0000U
+#define OLED_COLOR_WHITE   0xFFFFU
+#define OLED_COLOR_BLUE    0x001FU
+#define OLED_COLOR_RED     0xF800U
+#define OLED_COLOR_GREEN   0x07E0U
+#define OLED_COLOR_YELLOW  0xFFE0U
+#define OLED_COLOR_CYAN    0x07FFU
+#define OLED_COLOR_MAGENTA 0xF81FU
+
 #ifndef GPIO_OLED_PIN_RES_PORT
 #if defined(GPIO_OLED_PIN_OLED_RES_PIN)
 #define GPIO_OLED_PIN_RES_PORT GPIO_OLED_PORT
@@ -92,5 +101,6 @@ void OLED_ShowString(uint8_t x,uint8_t y,uint8_t *chr,uint8_t sizey);
 void OLED_ShowChinese(uint8_t x,uint8_t y,uint8_t no,uint8_t sizey);
 void OLED_DrawBMP(uint8_t x,uint8_t y,uint8_t sizex, uint8_t sizey,uint8_t BMP[]);
 void OLED_Init(void);
+void OLED_SetTheme(uint16_t fgColor, uint16_t bgColor);
 
 #endif /* #ifndef __OLED_HARDWARE_SPI_H */

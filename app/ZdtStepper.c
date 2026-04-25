@@ -6,10 +6,40 @@
 #define ZDT_STEPPER_RX_BUF_SIZE   (32U)
 #define ZDT_STEPPER_MMCL_BUF_SIZE (64U)
 
+typedef struct {
+    uint8_t data[ZDT_STEPPER_RX_BUF_SIZE];
+    uint8_t count;
+    uint8_t frameReady;
+    uint8_t lastCmd;
+    uint8_t lastCount;
+    uint8_t lastByte0;
+    uint8_t lastByte1;
+    uint8_t lastByte2;
+    uint8_t lastByte3;
+} ZdtStepperRxFrame;
+
+static uint8_t ZdtStepper_GetExpectedFrameLength(uint8_t cmd)
+{
+    switch (cmd) {
+        case 0x35U:
+            return 6U;
+        case 0x36U:
+            return 8U;
+        case 0x3AU:
+            return 4U;
+        case 0x3DU:
+            return 4U;
+        default:
+            return 0U;
+    }
+}
+
 static volatile uint8_t g_bj1RxBuf[ZDT_STEPPER_RX_BUF_SIZE];
 static volatile uint8_t g_bj2RxBuf[ZDT_STEPPER_RX_BUF_SIZE];
 static volatile uint8_t g_bj1RxCount;
 static volatile uint8_t g_bj2RxCount;
+static volatile ZdtStepperRxFrame g_bj1Frame;
+static volatile ZdtStepperRxFrame g_bj2Frame;
 
 static uint8_t g_bj1MmclBuf[ZDT_STEPPER_MMCL_BUF_SIZE];
 static uint8_t g_bj2MmclBuf[ZDT_STEPPER_MMCL_BUF_SIZE];
@@ -31,6 +61,57 @@ static uint8_t *ZdtStepper_GetMmclBuf(ZdtStepperPort port)
 static uint16_t *ZdtStepper_GetMmclCount(ZdtStepperPort port)
 {
     return (port == ZDT_STEPPER_BJ1) ? &g_bj1MmclCount : &g_bj2MmclCount;
+}
+
+static volatile ZdtStepperRxFrame *ZdtStepper_GetFrame(ZdtStepperPort port)
+{
+    return (port == ZDT_STEPPER_BJ1) ? &g_bj1Frame : &g_bj2Frame;
+}
+
+static void ZdtStepper_RxPushByte(ZdtStepperPort port, uint8_t byte)
+{
+    volatile uint8_t *rxBuf = (port == ZDT_STEPPER_BJ1) ? g_bj1RxBuf : g_bj2RxBuf;
+    volatile uint8_t *rxCount = (port == ZDT_STEPPER_BJ1) ? &g_bj1RxCount : &g_bj2RxCount;
+    volatile ZdtStepperRxFrame *frame = ZdtStepper_GetFrame(port);
+
+    if (*rxCount >= ZDT_STEPPER_RX_BUF_SIZE) {
+        *rxCount = 0U;
+    }
+
+    rxBuf[*rxCount] = byte;
+    (*rxCount)++;
+
+    if ((*rxCount >= 2U) && (ZdtStepper_GetExpectedFrameLength(rxBuf[1]) != 0U) &&
+        (*rxCount >= ZdtStepper_GetExpectedFrameLength(rxBuf[1]))) {
+        uint8_t i;
+        uint8_t frameLength = ZdtStepper_GetExpectedFrameLength(rxBuf[1]);
+        frame->count = frameLength;
+        for (i = 0U; i < frameLength; i++) {
+            frame->data[i] = rxBuf[i];
+        }
+        frame->frameReady = (frame->data[frameLength - 1U] == 0x6BU) ? 1U : 0U;
+        frame->lastCount = frameLength;
+        frame->lastByte0 = frame->data[0];
+        frame->lastByte1 = (frameLength > 1U) ? frame->data[1] : 0U;
+        frame->lastByte2 = (frameLength > 2U) ? frame->data[2] : 0U;
+        frame->lastByte3 = (frameLength > 3U) ? frame->data[3] : 0U;
+        frame->lastCmd = (frameLength > 1U) ? frame->data[1] : 0U;
+        *rxCount = 0U;
+    } else if ((*rxCount >= 2U) && (ZdtStepper_GetExpectedFrameLength(rxBuf[1]) == 0U)) {
+        *rxCount = 0U;
+    }
+}
+
+static uint8_t ZdtStepper_GetFrameCount(ZdtStepperPort port)
+{
+    volatile ZdtStepperRxFrame *frame = ZdtStepper_GetFrame(port);
+    return (frame->frameReady != 0U) ? frame->count : 0U;
+}
+
+static uint8_t ZdtStepper_GetFrameByte(ZdtStepperPort port, uint8_t index)
+{
+    volatile ZdtStepperRxFrame *frame = ZdtStepper_GetFrame(port);
+    return ((frame->frameReady != 0U) && (index < frame->count)) ? frame->data[index] : 0U;
 }
 
 static const ZdtStepperAxis g_gimbal_yaw_axis = { ZDT_STEPPER_BJ1, 1U };
@@ -121,6 +202,22 @@ void ZdtStepper_Init(void)
     g_bj2MmclCount = 0U;
     g_bj1TxTimeoutCount = 0U;
     g_bj2TxTimeoutCount = 0U;
+    g_bj1Frame.count = 0U;
+    g_bj1Frame.frameReady = 0U;
+    g_bj1Frame.lastCmd = 0U;
+    g_bj1Frame.lastCount = 0U;
+    g_bj1Frame.lastByte0 = 0U;
+    g_bj1Frame.lastByte1 = 0U;
+    g_bj1Frame.lastByte2 = 0U;
+    g_bj1Frame.lastByte3 = 0U;
+    g_bj2Frame.count = 0U;
+    g_bj2Frame.frameReady = 0U;
+    g_bj2Frame.lastCmd = 0U;
+    g_bj2Frame.lastCount = 0U;
+    g_bj2Frame.lastByte0 = 0U;
+    g_bj2Frame.lastByte1 = 0U;
+    g_bj2Frame.lastByte2 = 0U;
+    g_bj2Frame.lastByte3 = 0U;
 
     DL_UART_drainRXFIFO(UART_bj1_INST, dummy, 8);
     DL_UART_drainRXFIFO(UART_bj2_INST, dummy, 8);
@@ -132,12 +229,16 @@ void ZdtStepper_Init(void)
 
 void ZdtStepper_ClearRx(ZdtStepperPort port)
 {
+    volatile ZdtStepperRxFrame *frame = ZdtStepper_GetFrame(port);
+
     __disable_irq();
     if (port == ZDT_STEPPER_BJ1) {
         g_bj1RxCount = 0U;
     } else {
         g_bj2RxCount = 0U;
     }
+    frame->count = 0U;
+    frame->frameReady = 0U;
     __enable_irq();
 }
 
@@ -409,22 +510,129 @@ bool ZdtStepper_ParseVel(ZdtStepperPort port, float *vel)
         return false;
     }
 
-    count = ZdtStepper_GetRxCount(port);
-    if (count != 6U) {
+    count = ZdtStepper_GetFrameCount(port);
+    if (count < 6U) {
         return false;
     }
 
-    if (ZdtStepper_GetRxByte(port, 1U) != 0x35U) {
+    if (ZdtStepper_GetFrameByte(port, 1U) != 0x35U) {
         return false;
     }
 
-    sign = ZdtStepper_GetRxByte(port, 2U);
-    raw = ((uint16_t) ZdtStepper_GetRxByte(port, 3U) << 8) | ZdtStepper_GetRxByte(port, 4U);
+    sign = ZdtStepper_GetFrameByte(port, 2U);
+    raw = ((uint16_t) ZdtStepper_GetFrameByte(port, 3U) << 8) | ZdtStepper_GetFrameByte(port, 4U);
     *vel = (float) raw * 0.1f;
     if (sign != 0U) {
         *vel = -*vel;
     }
 
+    return true;
+}
+
+void ZdtStepper_ReadPos(ZdtStepperPort port, uint8_t addr)
+{
+    uint8_t cmd[3];
+
+    cmd[0] = addr;
+    cmd[1] = 0x36;
+    cmd[2] = 0x6B;
+
+    ZdtStepper_SendBytes(port, cmd, 3);
+}
+
+bool ZdtStepper_ParsePos(ZdtStepperPort port, int32_t *pos)
+{
+    uint8_t count;
+    uint8_t sign;
+    uint32_t raw;
+
+    if (pos == 0) {
+        return false;
+    }
+
+    count = ZdtStepper_GetFrameCount(port);
+    if (count < 8U) {
+        return false;
+    }
+
+    if (ZdtStepper_GetFrameByte(port, 1U) != 0x36U) {
+        return false;
+    }
+
+    sign = ZdtStepper_GetFrameByte(port, 2U);
+    raw = ((uint32_t) ZdtStepper_GetFrameByte(port, 3U) << 24) |
+          ((uint32_t) ZdtStepper_GetFrameByte(port, 4U) << 16) |
+          ((uint32_t) ZdtStepper_GetFrameByte(port, 5U) << 8) |
+          (uint32_t) ZdtStepper_GetFrameByte(port, 6U);
+    *pos = (int32_t) raw;
+    if (sign != 0U) {
+        *pos = -*pos;
+    }
+
+    return true;
+}
+
+void ZdtStepper_ReadFlag(ZdtStepperPort port, uint8_t addr)
+{
+    uint8_t cmd[3];
+
+    cmd[0] = addr;
+    cmd[1] = 0x3A;
+    cmd[2] = 0x6B;
+
+    ZdtStepper_SendBytes(port, cmd, 3);
+}
+
+bool ZdtStepper_ParseFlag(ZdtStepperPort port, uint8_t *flag)
+{
+    uint8_t count;
+
+    if (flag == 0) {
+        return false;
+    }
+
+    count = ZdtStepper_GetFrameCount(port);
+    if (count < 4U) {
+        return false;
+    }
+
+    if (ZdtStepper_GetFrameByte(port, 1U) != 0x3AU) {
+        return false;
+    }
+
+    *flag = ZdtStepper_GetFrameByte(port, 2U);
+    return true;
+}
+
+void ZdtStepper_ReadIo(ZdtStepperPort port, uint8_t addr)
+{
+    uint8_t cmd[3];
+
+    cmd[0] = addr;
+    cmd[1] = 0x3D;
+    cmd[2] = 0x6B;
+
+    ZdtStepper_SendBytes(port, cmd, 3);
+}
+
+bool ZdtStepper_ParseIo(ZdtStepperPort port, uint8_t *io)
+{
+    uint8_t count;
+
+    if (io == 0) {
+        return false;
+    }
+
+    count = ZdtStepper_GetFrameCount(port);
+    if (count < 4U) {
+        return false;
+    }
+
+    if (ZdtStepper_GetFrameByte(port, 1U) != 0x3DU) {
+        return false;
+    }
+
+    *io = ZdtStepper_GetFrameByte(port, 2U);
     return true;
 }
 
@@ -510,22 +718,48 @@ uint8_t ZdtStepper_GetRxByte(ZdtStepperPort port, uint8_t index)
 
 void UART_bj1_INST_IRQHandler(void)
 {
-    while ((DL_UART_Main_isRXFIFOEmpty(UART_bj1_INST) == false) && (g_bj1RxCount < ZDT_STEPPER_RX_BUF_SIZE)) {
-        g_bj1RxBuf[g_bj1RxCount++] = (uint8_t) DL_UART_Main_receiveData(UART_bj1_INST);
-    }
-
     while (DL_UART_Main_isRXFIFOEmpty(UART_bj1_INST) == false) {
-        (void) DL_UART_Main_receiveData(UART_bj1_INST);
+        ZdtStepper_RxPushByte(ZDT_STEPPER_BJ1, (uint8_t) DL_UART_Main_receiveData(UART_bj1_INST));
     }
+}
+
+uint8_t ZdtStepper_GetLastFrameCount(ZdtStepperPort port)
+{
+    return ZdtStepper_GetFrameCount(port);
+}
+
+uint8_t ZdtStepper_GetLastFrameCmd(ZdtStepperPort port)
+{
+    volatile ZdtStepperRxFrame *frame = ZdtStepper_GetFrame(port);
+    return frame->lastCmd;
+}
+
+uint8_t ZdtStepper_GetLastFrameByte(ZdtStepperPort port, uint8_t index)
+{
+    volatile ZdtStepperRxFrame *frame = ZdtStepper_GetFrame(port);
+
+    switch (index) {
+        case 0U:
+            return frame->lastByte0;
+        case 1U:
+            return frame->lastByte1;
+        case 2U:
+            return frame->lastByte2;
+        case 3U:
+            return frame->lastByte3;
+        default:
+            return 0U;
+    }
+}
+
+uint8_t ZdtStepper_GetPendingRxCount(ZdtStepperPort port)
+{
+    return (port == ZDT_STEPPER_BJ1) ? g_bj1RxCount : g_bj2RxCount;
 }
 
 void UART_bj2_INST_IRQHandler(void)
 {
-    while ((DL_UART_Main_isRXFIFOEmpty(UART_bj2_INST) == false) && (g_bj2RxCount < ZDT_STEPPER_RX_BUF_SIZE)) {
-        g_bj2RxBuf[g_bj2RxCount++] = (uint8_t) DL_UART_Main_receiveData(UART_bj2_INST);
-    }
-
     while (DL_UART_Main_isRXFIFOEmpty(UART_bj2_INST) == false) {
-        (void) DL_UART_Main_receiveData(UART_bj2_INST);
+        ZdtStepper_RxPushByte(ZDT_STEPPER_BJ2, (uint8_t) DL_UART_Main_receiveData(UART_bj2_INST));
     }
 }

@@ -4,6 +4,10 @@
 #include "clock.h"
 #include "Drivers/MPU6050/mpu6050.h"
 #include "wit.h"
+#include "PID/PID.h"
+
+/** PID控制标志，由main.c设置 */
+extern uint8_t drive_pid_active;
 
 uint8_t enable_group1_irq = 0;
 
@@ -13,6 +17,8 @@ void Interrupt_Init(void)
         NVIC_EnableIRQ(GPIOB_INT_IRQn);
         NVIC_EnableIRQ(GPIOA_INT_IRQn);
     }
+    /** 启用10ms定时器中断(TIMA0) */
+    NVIC_EnableIRQ(TIMA0_INT_IRQn);
 }
 
 void SysTick_Handler(void)
@@ -23,6 +29,9 @@ void SysTick_Handler(void)
 void TIMA0_IRQHandler(void)
 {
     DL_TimerA_clearInterruptStatus(TIMER_0_INST, DL_TIMERA_INTERRUPT_ZERO_EVENT);
+    if (drive_pid_active != 0U) {
+        double_pid();
+    }
 }
 
 #if defined UART_BNO08X_INST_IRQHandler

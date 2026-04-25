@@ -12,5 +12,10 @@
 #include "Drivers/MPU6050/mpu6050.h"
 #include "tof400f.h"
 #include "app/CameraControl.h"
+#include "app/ZdtStepper.h"
+#include "app/AppTypes.h"
+#include "app/DriveBase.h"
+#include "motor/Motor.h"
+#include "PID/PID.h"
 
 #endif  /* #ifndef _MAIN_H_ */

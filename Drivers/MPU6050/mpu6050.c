@@ -1,6 +1,7 @@
 #include "ti_msp_dl_config.h"
 
 #include <math.h>
+#include <stdlib.h>
 #include <stdint.h>
 
 #include "clock.h"
@@ -59,8 +60,8 @@ static float MPU6050_ApplyYawSuppression(float gz, float dt)
     if ((fabsf(mpu6050_gyro.x_dps) < 3.0f) &&
         (fabsf(mpu6050_gyro.y_dps) < 3.0f) &&
         (fabsf(gz) < 3.0f) &&
-        (fabsf(accel[0]) < 3000) &&
-        (fabsf(accel[1]) < 3000)) {
+        (abs(accel[0]) < 3000) &&
+        (abs(accel[1]) < 3000)) {
         g_mpu6050_yaw_bias_dps += (gz - g_mpu6050_yaw_bias_dps) * MPU6050_YAW_BIAS_TRACK_ALPHA;
         yawRate = gz - g_mpu6050_yaw_bias_dps;
     }
