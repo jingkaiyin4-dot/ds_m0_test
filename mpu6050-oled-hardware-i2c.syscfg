@@ -113,13 +113,6 @@ GPIO3.associatedPins[3].initialValue = "SET";
 GPIO3.associatedPins[3].assignedPort = "PORTB";
 GPIO3.associatedPins[3].assignedPin  = "26";
 
-GPIO4.$name                              = "GPIO_TRANS";
-GPIO4.port                               = "PORTA";
-GPIO4.associatedPins[0].$name            = "PIN_TRANS_CAM_TOF";
-GPIO4.associatedPins[0].direction        = "INPUT";
-GPIO4.associatedPins[0].internalResistor = "PULL_UP";
-GPIO4.associatedPins[0].pin.$assign      = "PA12";
-
 GPIO5.$name                          = "GPIO_MPU6050";
 GPIO5.associatedPins[0].$name        = "PIN_MPU6050_INT";
 GPIO5.associatedPins[0].assignedPort = "PORTA";
@@ -150,13 +143,6 @@ GPIO6.associatedPins[2].assignedPortSegment = "Upper";
 GPIO6.associatedPins[2].assignedPin         = "17";
 GPIO6.associatedPins[2].$name               = "PIN_KEY_DOWN";
 GPIO6.associatedPins[2].internalResistor    = "PULL_UP";
-
-GPIO7.$name                          = "GPIO_BUZZER";
-GPIO7.port                           = "PORTA";
-GPIO7.portSegment                    = "Upper";
-GPIO7.associatedPins[0].$name        = "PIN_BUZZER";
-GPIO7.associatedPins[0].initialValue = "SET";
-GPIO7.associatedPins[0].pin.$assign  = "PA27";
 
 GPIO8.$name                              = "GPIO_HUIDU";
 GPIO8.associatedPins.create(8);
@@ -197,14 +183,14 @@ GPIO8.associatedPins[6].$name            = "PIN_HUIDU_7";
 GPIO8.associatedPins[6].direction        = "INPUT";
 GPIO8.associatedPins[6].internalResistor = "PULL_UP";
 GPIO8.associatedPins[6].assignedPort     = "PORTA";
-GPIO8.associatedPins[6].assignedPin      = "24";
-GPIO8.associatedPins[6].pin.$assign      = "PA24";
+GPIO8.associatedPins[6].assignedPin      = "12";
+GPIO8.associatedPins[6].pin.$assign      = "PA12";
 GPIO8.associatedPins[7].$name            = "PIN_HUIDU_8";
 GPIO8.associatedPins[7].direction        = "INPUT";
 GPIO8.associatedPins[7].internalResistor = "PULL_UP";
 GPIO8.associatedPins[7].assignedPort     = "PORTA";
-GPIO8.associatedPins[7].assignedPin      = "25";
-GPIO8.associatedPins[7].pin.$assign      = "PA25";
+GPIO8.associatedPins[7].assignedPin      = "26";
+GPIO8.associatedPins[7].pin.$assign      = "PA26";
 
 GPIO9.$name                   = "GPIO_LED";
 GPIO9.associatedPins[0].$name = "PIN_LED_BOARD";

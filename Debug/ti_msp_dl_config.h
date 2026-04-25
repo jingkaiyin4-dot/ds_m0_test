@@ -232,12 +232,12 @@ extern "C" {
 #define UART_BNO08_INST_DMA_TRIGGER                          (DMA_UART2_RX_TRIG)
 
 
-/* Port definition for Pin Group GPIO_TRANS */
-#define GPIO_TRANS_PORT                                                  (GPIOA)
+/* Port definition for Pin Group GPIO_GRP_3 */
+#define GPIO_GRP_3_PORT                                                  (GPIOA)
 
-/* Defines for PIN_TRANS_CAM_TOF: GPIOA.12 with pinCMx 34 on package pin 5 */
-#define GPIO_TRANS_PIN_TRANS_CAM_TOF_PIN                        (DL_GPIO_PIN_12)
-#define GPIO_TRANS_PIN_TRANS_CAM_TOF_IOMUX                       (IOMUX_PINCM34)
+/* Defines for PIN_3: GPIOA.21 with pinCMx 46 on package pin 17 */
+#define GPIO_GRP_3_PIN_3_PIN                                    (DL_GPIO_PIN_21)
+#define GPIO_GRP_3_PIN_3_IOMUX                                   (IOMUX_PINCM46)
 /* Port definition for Pin Group GPIO_MPU6050 */
 #define GPIO_MPU6050_PORT                                                (GPIOA)
 
@@ -248,12 +248,12 @@ extern "C" {
 #define GPIO_MPU6050_PIN_MPU6050_INT_IIDX                   (DL_GPIO_IIDX_DIO15)
 #define GPIO_MPU6050_PIN_MPU6050_INT_PIN                        (DL_GPIO_PIN_15)
 #define GPIO_MPU6050_PIN_MPU6050_INT_IOMUX                       (IOMUX_PINCM37)
-/* Port definition for Pin Group GPIO_BUZZER */
-#define GPIO_BUZZER_PORT                                                 (GPIOA)
+/* Port definition for Pin Group GPIO_GRP_6 */
+#define GPIO_GRP_6_PORT                                                  (GPIOB)
 
-/* Defines for PIN_BUZZER: GPIOA.27 with pinCMx 60 on package pin 31 */
-#define GPIO_BUZZER_PIN_BUZZER_PIN                              (DL_GPIO_PIN_27)
-#define GPIO_BUZZER_PIN_BUZZER_IOMUX                             (IOMUX_PINCM60)
+/* Defines for PIN_6: GPIOB.17 with pinCMx 43 on package pin 14 */
+#define GPIO_GRP_6_PIN_6_PIN                                    (DL_GPIO_PIN_17)
+#define GPIO_GRP_6_PIN_6_IOMUX                                   (IOMUX_PINCM43)
 /* Port definition for Pin Group GPIO_LED */
 #define GPIO_LED_PORT                                                    (GPIOA)
 
@@ -347,14 +347,14 @@ extern "C" {
 #define GPIO_HUIDU_PIN_HUIDU_6_PORT                                      (GPIOB)
 #define GPIO_HUIDU_PIN_HUIDU_6_PIN                              (DL_GPIO_PIN_20)
 #define GPIO_HUIDU_PIN_HUIDU_6_IOMUX                             (IOMUX_PINCM48)
-/* Defines for PIN_HUIDU_7: GPIOA.24 with pinCMx 54 on package pin 25 */
+/* Defines for PIN_HUIDU_7: GPIOA.12 with pinCMx 34 on package pin 5 */
 #define GPIO_HUIDU_PIN_HUIDU_7_PORT                                      (GPIOA)
-#define GPIO_HUIDU_PIN_HUIDU_7_PIN                              (DL_GPIO_PIN_24)
-#define GPIO_HUIDU_PIN_HUIDU_7_IOMUX                             (IOMUX_PINCM54)
-/* Defines for PIN_HUIDU_8: GPIOA.25 with pinCMx 55 on package pin 26 */
+#define GPIO_HUIDU_PIN_HUIDU_7_PIN                              (DL_GPIO_PIN_12)
+#define GPIO_HUIDU_PIN_HUIDU_7_IOMUX                             (IOMUX_PINCM34)
+/* Defines for PIN_HUIDU_8: GPIOA.26 with pinCMx 59 on package pin 30 */
 #define GPIO_HUIDU_PIN_HUIDU_8_PORT                                      (GPIOA)
-#define GPIO_HUIDU_PIN_HUIDU_8_PIN                              (DL_GPIO_PIN_25)
-#define GPIO_HUIDU_PIN_HUIDU_8_IOMUX                             (IOMUX_PINCM55)
+#define GPIO_HUIDU_PIN_HUIDU_8_PIN                              (DL_GPIO_PIN_26)
+#define GPIO_HUIDU_PIN_HUIDU_8_IOMUX                             (IOMUX_PINCM59)
 
 /* clang-format on */
 

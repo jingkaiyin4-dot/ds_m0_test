@@ -43,58 +43,70 @@ void Grayscale_Process(uint8_t state, float base_speed) {
   switch (state) {
   /* 直行状态 */
   case 0b00011000: // 0x18: 完美居中
-    left_speed = 4.0f;
-    right_speed = 4.0f;
+    left_speed = 3.0f;
+    right_speed = 3.0f;
     break;
   case 0b00010000: // 0x10: 略微偏左
-    left_speed = 3.5f;
-    right_speed = 4.5f;
+    left_speed = 2.5f;
+    right_speed = 3.0f;
     break;
   case 0b00001000: // 0x08: 略微偏右
-    left_speed = 4.5f;
-    right_speed = 3.5f;
+    left_speed = 3.0f;
+    right_speed = 2.5f;
     break;
 
   /* 需要左转 (减速左轮，加速右轮) */
   case 0b00110000: // 0x30
-    left_speed = 4.0f;
-    right_speed = 4.0f;
+    left_speed = 3.0f;
+    right_speed = 3.5f;
     break;
   case 0b01100000: // 0x60
-    left_speed = 1.0f;
-    right_speed = 6.5f;
+    left_speed = 2.0f;
+    right_speed = 4.0f;
     break;
   case 0b00100000: // 0x20
-    left_speed = 3.0f;
-    right_speed = 4.5f;
+    left_speed = 2.0f;
+    right_speed = 4.2f;
     break;
   case 0b11000000:     // 0xC0
     left_speed = 1.0f; // 左轮轻微反转帮助急转
-    right_speed = 6.5f;
+    right_speed = 4.0f;
     break;
+
   case 0b10000000: // 0x80: 极其偏右，急左转
-    left_speed = 1.0f;
-    right_speed = 6.5f;
+    left_speed = .0f;
+    right_speed = 4.0f;
     break;
 
   /* 需要右转 (加速左轮，减速右轮) */
   case 0b00001100: // 0x0C
-    left_speed = 4.0f;
-    right_speed = 4.0f;
+    left_speed = 3.0f;
+    right_speed = 3.0f;
+    break;
+  case 0b00000010: // 0x02
+    left_speed = 4.5f;
+    right_speed = 1.0f;
     break;
   case 0b00000110: // 0x06
-    left_speed = 6.5f;
+    left_speed = 5.5f;
     right_speed = 1.0f;
     break;
-  case 0b00000011: // 0x03
-    left_speed = 7.5f;
-    right_speed = 1.0f; // 右轮轻微反转帮助急转
-    break;
+    //   case 0b00000011: // 0x03
+    //     left_speed = 7.5f;
+    //     right_speed = 1.0f; // 右轮轻微反转帮助急转
+    //     break;
+  //   case 0b00000001: // 0x01: 极其偏左，急右转
+  //     left_speed = 8.5f;
+  //     right_speed = 1.0f;
+  //     break;
   case 0b00000001: // 0x01: 极其偏左，急右转
-    left_speed = 8.5f;
-    right_speed = 1.0f;
+    left_speed = 0.0f;
+    right_speed = 0.0f;
     break;
-
+  case 0b11111110: // 0x01: 极其偏左，急右转
+    left_speed = 0.0f;
+    right_speed = 0.0f;
+    break;
   /* 停止情况处理 */
   case 0b11111111: // 0xFF: 遇到十字路口或停止线(全黑)
   case 0b00000000: // 0x00: 丢线(全白)

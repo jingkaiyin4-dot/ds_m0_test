@@ -211,7 +211,9 @@ int main(void)
     MPU6050_Init();
 
     /* PA12 uses pull-up: low selects TOF, high selects CAM. */
-    uart_cam_use_tof = (DL_GPIO_readPins(GPIO_TRANS_PORT, GPIO_TRANS_PIN_TRANS_CAM_TOF_PIN) == 0U) ? 1U : 0U;
+    /** PA12 原本用于 TOF 切换，现在已挪作灰度第 7 路使用，因此禁用此检测 */
+    // uart_cam_use_tof = (DL_GPIO_readPins(GPIO_TRANS_PORT, GPIO_TRANS_PIN_TRANS_CAM_TOF_PIN) == 0U) ? 1U : 0U;
+    uart_cam_use_tof = 0U;
     if (uart_cam_use_tof != 0U) {
         CameraControl_DisableUart();
         TOF400F_EnableUart();
