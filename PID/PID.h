@@ -29,19 +29,36 @@ typedef struct {
     float target;
     /** 实际值: 当前位置或当前速度 */
     float actual;
-    /** 积分累加器: 累加历史误差 */
-    float integral;
-    /** 上次误差: 原代码用于计算微分项，现已弃用，但为了兼容性保留，或可直接删除。由于需要存储上次实际值来防止微分突变，增加下述变量： */
-    float prevError;
-    /** 上次实际值: 改进后的微分项计算需要 */
-    float prevActual;
     /** PID输出: 位置环=目标速度, 速度环=duty */
     float output;
-    /** 积分饱和限幅: 防止积分饱和 */
+    float prevError;
+    float prevActual;      /** 用于微分踢除: 记录上一次的实际值 */
+    float integral;
     float integralLimit;
-    /** 输出限幅: 位置环限制最大速度, 速度环限制最大duty */
     float outputLimit;
 } PIDController;
+
+/**
+ * @brief 姿态数据结构体
+ */
+typedef struct {
+    float yaw;
+    float pitch;
+    float roll;
+    float gyroX;           /** 角速度 (用于平衡环微分) */
+    float gyroY;
+    float gyroZ;
+} ImuData;
+
+/**
+ * @brief 直立平衡环控制器
+ */
+typedef struct {
+    PIDController pid;         /** 直立环 PID (通常只需要 PD) */
+    PIDController velocityPid; /** 速度外环 PID (通常只需要 PI) */
+    float mechanicalMedian;    /** 机械中值 (车体垂直时的角度) */
+    ImuData imu;               /** 当前 IMU 数据状态 */
+} BalanceController;
 
 typedef struct {
     /** 外环位置PID: target=目标位置(计数), output=目标速度(RPS) */
@@ -79,9 +96,18 @@ typedef struct {
     float rightMotorOutputSign;
     /** 是否启用位置环(外环): 1=启用双环, 0=仅启用速度环(由外部直接设定speed.target) */
     uint8_t enablePositionLoop;
+    /** 直立平衡环控制 */
+    BalanceController balance;
+    /** 是否启用直立环: 1=平衡模式, 0=普通模式 */
+    uint8_t enableBalanceLoop;
 } DriveController;
 
 extern DriveController g_driveController;
+
+/**
+ * @brief 从外部更新控制器内部的 IMU 数据
+ */
+void DriveController_UpdateImu(float pitch, float roll, float yaw, float gx, float gy, float gz);
 
 /**
  * @brief 初始化双环PID控制器
@@ -90,7 +116,7 @@ extern DriveController g_driveController;
 void DriveController_Init(void);
 
 /**
- * @brief 执行一次双环PID控制
+ * @brief 执行一次全系统PID控制
  * 每个控制周期(10ms)调用一次
  */
 void double_pid(void);
