@@ -18,4 +18,12 @@
 #include "motor/Motor.h"
 #include "PID/PID.h"
 
+void App_StartDrivePidTest(void);
+void App_StopDrivePidTest(void);
+void App_ResetDriveState(void);
+void App_SetImuSource(uint8_t useBno08x);
+uint8_t App_GetImuSource(void);
+uint8_t App_IsDrivePidActive(void);
+uint8_t App_IsTofUartEnabled(void);
+
 #endif  /* #ifndef _MAIN_H_ */

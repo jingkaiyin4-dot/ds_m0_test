@@ -331,6 +331,7 @@ void OLED_SetTheme(uint16_t fgColor, uint16_t bgColor)
 {
     g_oledFgColor = fgColor;
     g_oledBgColor = bgColor;
+    OLED_ColorTurn((fgColor == OLED_COLOR_YELLOW) ? 1U : 0U);
 }
 
 void OLED_Init(void)

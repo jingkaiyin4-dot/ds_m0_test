@@ -232,12 +232,6 @@ extern "C" {
 #define UART_BNO08_INST_DMA_TRIGGER                          (DMA_UART2_RX_TRIG)
 
 
-/* Port definition for Pin Group GPIO_GRP_3 */
-#define GPIO_GRP_3_PORT                                                  (GPIOA)
-
-/* Defines for PIN_3: GPIOA.21 with pinCMx 46 on package pin 17 */
-#define GPIO_GRP_3_PIN_3_PIN                                    (DL_GPIO_PIN_21)
-#define GPIO_GRP_3_PIN_3_IOMUX                                   (IOMUX_PINCM46)
 /* Port definition for Pin Group GPIO_MPU6050 */
 #define GPIO_MPU6050_PORT                                                (GPIOA)
 
@@ -249,17 +243,17 @@ extern "C" {
 #define GPIO_MPU6050_PIN_MPU6050_INT_PIN                        (DL_GPIO_PIN_15)
 #define GPIO_MPU6050_PIN_MPU6050_INT_IOMUX                       (IOMUX_PINCM37)
 /* Port definition for Pin Group GPIO_GRP_6 */
-#define GPIO_GRP_6_PORT                                                  (GPIOB)
+#define GPIO_GRP_6_PORT                                                  (GPIOA)
 
-/* Defines for PIN_6: GPIOB.17 with pinCMx 43 on package pin 14 */
-#define GPIO_GRP_6_PIN_6_PIN                                    (DL_GPIO_PIN_17)
-#define GPIO_GRP_6_PIN_6_IOMUX                                   (IOMUX_PINCM43)
+/* Defines for PIN_6: GPIOA.18 with pinCMx 40 on package pin 11 */
+#define GPIO_GRP_6_PIN_6_PIN                                    (DL_GPIO_PIN_18)
+#define GPIO_GRP_6_PIN_6_IOMUX                                   (IOMUX_PINCM40)
 /* Port definition for Pin Group GPIO_LED */
-#define GPIO_LED_PORT                                                    (GPIOA)
+#define GPIO_LED_PORT                                                    (GPIOB)
 
-/* Defines for PIN_LED_BOARD: GPIOA.18 with pinCMx 40 on package pin 11 */
-#define GPIO_LED_PIN_LED_BOARD_PIN                              (DL_GPIO_PIN_18)
-#define GPIO_LED_PIN_LED_BOARD_IOMUX                             (IOMUX_PINCM40)
+/* Defines for PIN_LED_BOARD: GPIOB.17 with pinCMx 43 on package pin 14 */
+#define GPIO_LED_PIN_LED_BOARD_PIN                              (DL_GPIO_PIN_17)
+#define GPIO_LED_PIN_LED_BOARD_IOMUX                             (IOMUX_PINCM43)
 /* Port definition for Pin Group Encoder */
 #define Encoder_PORT                                                     (GPIOB)
 

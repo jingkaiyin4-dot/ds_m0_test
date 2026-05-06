@@ -1,0 +1,42 @@
+# Artistic Style 配置文件 - DevTools兼容
+# https://astyle.sourceforge.net/
+
+# 基本格式
+indent=spaces=4
+indent-col1-comment
+min-conditional-indent=0
+
+# 行宽度
+max-code-length=120
+break-after-logical
+
+# 大括号风格 - K&R
+style=kr
+keep-one-line-blocks
+keep-one-line-statements
+
+# 指针和引用
+align-pointer=name
+align-reference=name
+
+# 空行
+max-continuation-indent=4
+empty-line-soft=force
+
+# 括号和缩进
+indent-switches
+indent-cases
+indent-labels
+indent-preproc-block
+indent-preproc-define
+indent-within-poly-preproc
+
+# 其他
+preserve-date
+indent-col1-comment
+pad-header
+pad-oper
+pad-paren-out
+pad-paren-in
+unpad-paren
+pad-comma

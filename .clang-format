@@ -1,0 +1,41 @@
+---
+Language: Cpp
+BasedOnStyle: LLVM
+
+# 基础设置
+IndentWidth: 4
+TabWidth: 4
+UseTab: Never
+ColumnLimit: 120
+IndentCaseLabels: false
+
+# 大括号风格 - K&R 风格（嵌入式常用）
+BreakBeforeBraces: Attach
+AllowShortFunctionsOnASingleLine: Inline
+AllowShortIfStatementsOnASingleLine: Never
+AllowShortLoopsOnASingleLine: false
+
+# 空行间距
+MaxEmptyLinesToKeep: 1
+InsertNewlineAtEOF: true
+
+# 指针和引用
+PointerAlignment: Left
+ReferenceAlignment: Left
+
+# 头文件包含排序
+SortIncludes: true
+IncludeCategories:
+  - Regex: '^\"ti_msp_dl_config.h\"'
+    Priority: -1
+  - Regex: '^<.*\.h>'
+    Priority: 1
+  - Regex: '.*'
+    Priority: 2
+
+# 注释
+CommentPragmas: '^'
+ReflowComments: false
+
+# C++ 特定
+DerivePointerAlignment: false

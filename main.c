@@ -31,6 +31,7 @@
  */
 
 #include "main.h"
+#include "app/AppUi.h"
 #include "app/Grayscale.h"
 #include "stdio.h"
 #include "ti_msp_dl_config.h"
@@ -43,16 +44,12 @@ uint8_t imu_use_bno08x;
 static unsigned long now_ms;
 static unsigned long imu_sample_ms;
 
-/** PID控制标志，供 interrupt.c 的定时器中断读取 */
 uint8_t drive_pid_active;
-static AppButtonState g_modeButton;
 
 static const AppBusDevice g_bno08xBus = {APP_BUS_UART, "BNO08X", 0U, 115200U};
 static const AppBusDevice g_camBus = {APP_BUS_UART, "CAM", 0U, 115200U};
 static const AppBusDevice g_tofBus = {APP_BUS_UART, "TOF400F", 0U, 115200U};
 static const AppBusDevice g_mpuBus = {APP_BUS_I2C, "MPU6050", 0x68U, 400000U};
-
-#define APP_KEY_DEBOUNCE_MS 30U
 
 /** 目标行驶距离(圈数): 1圈=286counts */
 #define APP_DRIVE_PID_TARGET_TURNS 3.0f
@@ -73,7 +70,7 @@ static const AppBusDevice g_mpuBus = {APP_BUS_I2C, "MPU6050", 0x68U, 400000U};
  * 3. 清零历史状态
  * 4. 设置目标位置(编码器计数)
  */
-static void App_StartDrivePidTest(void) {
+void App_StartDrivePidTest(void) {
   /** 1. 复位编码器 */
   Encoder_ResetAll();
 
@@ -130,73 +127,38 @@ static void App_StartDrivePidTest(void) {
   drive_pid_active = 1U;
 }
 
-static void App_StopDrivePidTest(void) {
+void App_StopDrivePidTest(void) {
   Motor_StopAll();
   g_driveController.enableBalanceLoop = 0;
   drive_pid_active = 0U;
 }
 
-static void App_ApplyDisplayTheme(void) {
-  if (imu_use_bno08x != 0U) {
-    OLED_SetTheme(OLED_COLOR_YELLOW, OLED_COLOR_BLUE);
-  } else {
-    OLED_SetTheme(OLED_COLOR_WHITE, OLED_COLOR_BLACK);
-  }
-
-  OLED_Clear();
-  OLED_ShowString(0, 0, (uint8_t *)"Pitch", 8);
-  OLED_ShowString(0, 2, (uint8_t *)" Roll", 8);
-  OLED_ShowString(0, 4, (uint8_t *)"  Yaw", 8);
-  OLED_ShowString(72, 6, (uint8_t *)"C/R", 8);
-  if (uart_cam_use_tof != 0U) {
-    OLED_ShowString(0, 6, (uint8_t *)"TOF", 8);
-  } else {
-    OLED_ShowString(0, 6, (uint8_t *)"CAM", 8);
-  }
-  if (imu_use_bno08x != 0U) {
-    OLED_ShowString(0, 7, (uint8_t *)"BNO08X", 8);
-    OLED_ShowString(0, 8, (uint8_t *)"L CMD:", 8);
-    OLED_ShowString(0, 9, (uint8_t *)"L ENC:", 8);
-    OLED_ShowString(0, 10, (uint8_t *)"R CMD:", 8);
-    OLED_ShowString(0, 11, (uint8_t *)"R ENC:", 8);
-  } else {
-    OLED_ShowString(0, 7, (uint8_t *)"MPU6050", 8);
-    OLED_ShowString(0, 8, (uint8_t *)"L CMD:", 8);
-    OLED_ShowString(0, 9, (uint8_t *)"L ENC:", 8);
-    OLED_ShowString(0, 10, (uint8_t *)"R CMD:", 8);
-    OLED_ShowString(0, 11, (uint8_t *)"R ENC:", 8);
-  }
+void App_ResetDriveState(void) {
+  Encoder_ResetAll();
+  g_driveController.left.positionCounts = 0.0f;
+  g_driveController.right.positionCounts = 0.0f;
+  g_driveController.left.speedRps = 0.0f;
+  g_driveController.right.speedRps = 0.0f;
+  g_driveController.left.duty = 0.0f;
+  g_driveController.right.duty = 0.0f;
+  g_driveController.balance.pid.output = 0.0f;
+  g_driveController.balance.velocityPid.output = 0.0f;
 }
 
-static void App_ButtonUpdate(AppButtonState *button, uint8_t rawPressed,
-                             uint32_t now) {
-  static uint8_t lastSamplePressed = 0U;
-
-  button->clicked = 0U;
-
-  if (rawPressed != lastSamplePressed) {
-    lastSamplePressed = rawPressed;
-    button->stable_since_ms = now;
-  }
-
-  if ((now - button->stable_since_ms) >= APP_KEY_DEBOUNCE_MS) {
-    if (button->pressed != rawPressed) {
-      button->pressed = rawPressed;
-      if (button->pressed != 0U) {
-        button->clicked = 1U;
-      }
-    }
-  }
+void App_SetImuSource(uint8_t useBno08x) {
+  imu_use_bno08x = (useBno08x != 0U) ? 1U : 0U;
 }
 
-static uint8_t App_KeyPollToggleImu(void) {
-  uint8_t samplePressed = (DL_GPIO_readPins(GPIO_KEY_PIN_KEY_MODE_PORT,
-                                            GPIO_KEY_PIN_KEY_MODE_PIN) == 0U)
-                              ? 1U
-                              : 0U;
+uint8_t App_GetImuSource(void) {
+  return imu_use_bno08x;
+}
 
-  App_ButtonUpdate(&g_modeButton, samplePressed, now_ms);
-  return g_modeButton.clicked;
+uint8_t App_IsDrivePidActive(void) {
+  return drive_pid_active;
+}
+
+uint8_t App_IsTofUartEnabled(void) {
+  return uart_cam_use_tof;
 }
 
 #ifndef APP_USE_BNO08X
@@ -210,6 +172,7 @@ int main(void) {
   DriveController_Init();
   CameraControl_Init();
   TOF400F_Init();
+  AppUi_Init();
 
   imu_use_bno08x = APP_USE_BNO08X;
   BNO08X_Init();
@@ -234,10 +197,6 @@ int main(void) {
   tof400f_ok = 0;
   imu_sample_ms = 0U;
   drive_pid_active = 0U;
-  g_modeButton.pressed = 0U;
-  g_modeButton.clicked = 0U;
-  g_modeButton.stable_since_ms = 0U;
-  App_ApplyDisplayTheme();
   if (imu_use_bno08x != 0U) {
     App_StartDrivePidTest();
   }
@@ -249,18 +208,8 @@ int main(void) {
 
   while (1) {
     mspm0_get_clock_ms(&now_ms);
-    if (App_KeyPollToggleImu() != 0U) {
-      imu_use_bno08x ^= 1U;
-      if (imu_use_bno08x != 0U) {
-        App_StartDrivePidTest();
-      } else {
-        App_StopDrivePidTest();
-      }
-      App_ApplyDisplayTheme();
-    }
 
     if (imu_use_bno08x != 0U) {
-      // BNO08X 数据更新
       DriveController_UpdateImu(bno08x_data.pitch, bno08x_data.roll,
                                 bno08x_data.yaw, 0.0f, 0.0f, 0.0f);
     } else if (MPU6050_IsReady() != 0U) {
@@ -268,7 +217,6 @@ int main(void) {
           ((now_ms - imu_sample_ms) >= 20U)) {
         MPU6050_ClearPendingSample();
         Read_Quad();
-        // MPU6050 数据更新 (包含角速度)
         DriveController_UpdateImu(mpu6050_euler.pitch, mpu6050_euler.roll,
                                   mpu6050_euler.yaw, mpu6050_gyro.x_dps,
                                   mpu6050_gyro.y_dps, mpu6050_gyro.z_dps);
@@ -281,88 +229,7 @@ int main(void) {
       TOF400F_Query();
     }
 
-    /* PID控制已移至 TIMA0 定时器中断(10ms)执行，此处不再调用 */
-
-    /** 调试信息输出到 OLED */
-    if (drive_pid_active != 0U) {
-      sprintf((char *)oled_buffer, "PIT: %.2f  ",
-              g_driveController.balance.imu.pitch);
-      OLED_ShowString(0, 12, (uint8_t *)oled_buffer, 8);
-      sprintf((char *)oled_buffer, "TGT: %.2f  ",
-              g_driveController.balance.pid.target);
-      OLED_ShowString(0, 13, (uint8_t *)oled_buffer, 8);
-    }
-
-    /** [已注释] 读取灰度传感器并在OLED上显示二进制 */
-    // uint8_t gray_val = Grayscale_ReadBinary();
-    // sprintf((char *)oled_buffer, "GRAY:%c%c%c%c%c%c%c%c", ...);
-    // OLED_ShowString(0, 13, oled_buffer, 8);
-
-    /** [已注释] 如果PID控制激活，则将灰度值传入状态机计算转速 */
-    // if (drive_pid_active != 0U) {
-    //     g_driveController.enablePositionLoop = 0;
-    //     Grayscale_Process(gray_val, 4.0f);
-    // }
-
-    if (uart_cam_use_tof != 0U) {
-      tof400f_ok = TOF400F_IsReady();
-
-      if (tof400f_ok != 0U) {
-        tof400f_distance_mm = TOF400F_ReadDistanceMm();
-        sprintf((char *)oled_buffer, "%4umm",
-                (unsigned int)tof400f_distance_mm);
-      } else {
-        sprintf((char *)oled_buffer, "I%u C%02X",
-                (unsigned int)TOF400F_GetIrqCount(), TOF400F_GetLastChar());
-      }
-    } else {
-      sprintf((char *)oled_buffer, "%c %02X/%1u",
-              CameraControl_GetLastCommand(), CameraControl_GetPendingCommand(),
-              CameraControl_IsStepperRunning());
-    }
-    OLED_ShowString(24, 6, oled_buffer, 8);
-
-    if (imu_use_bno08x != 0U) {
-      sprintf((char *)oled_buffer, "%-6.1f", bno08x_data.pitch);
-    } else {
-      if (MPU6050_IsReady() != 0U) {
-        sprintf((char *)oled_buffer, "%-6.1f", mpu6050_euler.pitch);
-      } else {
-        sprintf((char *)oled_buffer, "W%02X A%02X", MPU6050_GetWhoAmI(),
-                MPU6050_GetAddress());
-      }
-    }
-    OLED_ShowString(5 * 8, 0, oled_buffer, 16);
-    if (imu_use_bno08x != 0U) {
-      sprintf((char *)oled_buffer, "%-6.1f", bno08x_data.roll);
-    } else {
-      if (MPU6050_IsReady() != 0U) {
-        sprintf((char *)oled_buffer, "%-6.1f", mpu6050_euler.roll);
-      } else {
-        sprintf((char *)oled_buffer, "GY%5.1f", mpu6050_gyro.y_dps);
-      }
-    }
-    OLED_ShowString(5 * 8, 2, oled_buffer, 16);
-    if (imu_use_bno08x != 0U) {
-      sprintf((char *)oled_buffer, "%-6.1f", bno08x_data.yaw);
-    } else {
-      if (MPU6050_IsReady() != 0U) {
-        sprintf((char *)oled_buffer, "%-6.1f", mpu6050_euler.yaw);
-      } else {
-        sprintf((char *)oled_buffer, "RD%1u", MPU6050_IsReady());
-      }
-    }
-    OLED_ShowString(5 * 8, 4, oled_buffer, 16);
-
-    /* 诊断显示: 左轮速度 (RPS) - 向前走时应该是正数还是负数? */
-    sprintf((char *)oled_buffer, "S%+6.2f",
-            (double)g_driveController.left.speedRps);
-    OLED_ShowString(0, 9, oled_buffer, 8);
-
-    /* 诊断显示: PID输出和速度环偏移 */
-    sprintf((char *)oled_buffer, "O%+6.1f",
-            (double)g_driveController.balance.pid.output);
-    OLED_ShowString(0, 11, oled_buffer, 8);
+    AppUi_Update((uint32_t)now_ms);
 
     mspm0_delay_ms(5);
   }
